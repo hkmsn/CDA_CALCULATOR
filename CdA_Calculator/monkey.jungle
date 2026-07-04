@@ -1,0 +1,6 @@
+# Reference the project manifest
+project.manifest = manifest.xml
+
+# Define the source paths (standard for Connect IQ projects)
+base.sourcePath = source
+base.resourcePath = resources

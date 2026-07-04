@@ -1,0 +1,10 @@
+<resources>
+<fitContributions>
+    <fitField id="0" 
+              displayInChart="true" 
+              displayInActivitySummary="true" 
+              dataLabel="@Strings.cda_label" 
+              unitLabel="@Strings.cda_units"
+              sortOrder = "0" />
+</fitContributions>
+</resources>

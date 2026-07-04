@@ -1,0 +1,10 @@
+<strings>
+    <string id="AppName">CdA_Calculator</string>
+    <string id="cda_label">CdA</string>
+    <string id="cda_units">m2</string>
+    <string id="bike_weight_title">Bike Weight (Kg)</string>
+    <string id="crr_title">Crr (e.g. 0.0045 for GP5000)</string>
+    <string id="use_sensor_title">Use External BLE Sensor</string>
+    <string id="sensor_opt_off">Off (Internal Only)</string>
+    <string id="sensor_opt_on">On (Use ESP32)</string>
+</strings>

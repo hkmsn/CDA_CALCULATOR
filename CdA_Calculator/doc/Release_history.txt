@@ -1,0 +1,25 @@
+With this Data Field, you can display average torque value in N-m during your training.
+
+You can configure the duration of the AVG value in seconds.
+
+Release History:
+
+- V1.07-2 - 2022-06-23
+* Add Edge 130 Plus support
+* Add Edge 1030 Plus support
+* Add Edge 1040 support
+
+- V1.07 - 2019-06-24
+* Fix display justification
+- V1.06 - 2019-06-11
+* Add Edge 530 support
+* Add Edge 830 support
+- V1.05 - 2018-04-30
+* Edge 130 support
+* Edge 520 Plus support
+- V1.04 - 2017-12-28
+* Garmin IQ - SDK 2.4.1
+* Edge 1030 support
+- V1.00 - 2016-03-23
+* Initial version
+* Supports Edge 520, Edge 1000

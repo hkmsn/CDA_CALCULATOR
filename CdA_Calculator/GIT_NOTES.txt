@@ -1,0 +1,48 @@
+# 1. Stage all your current changes
+git add .
+
+# 2. Create a final commit with a descriptive message
+git commit -m "create doc folder"
+
+# 3. Increase the Git buffer size to handle larger FIT file transfers
+git config http.postBuffer 52428800
+
+# 4. Overwrite the remote with your local master branch
+git push origin main --force
+
+# --- Monorepo / Multi-Project Management ---
+# 1. Add a new project as a submodule:
+# git submodule add https://github.com/username/other-project.git ./other-project
+
+# 2. When cloning this repo for the first time, include submodules:
+# git clone --recursive <this_repo_url>
+
+# 3. If already cloned, initialize submodules:
+# git submodule update --init --recursive
+
+# 4. Pull latest changes for all submodules from their remotes:
+# git submodule update --remote --merge
+
+# --- CdA Calculator Organization ---
+# Initialize at the TOP LEVEL of the project suite:
+# cd /Users/marknelson/Documents/dev/
+# mkdir CdA_calculator && cd CdA_calculator
+# git init
+
+# Create sub-folders:
+# mkdir docs
+# mkdir monkeyc_project
+# mkdir platformio_project
+
+# Note: Ensure .gitignore is updated if PlatformIO creates large build folders (.pio)
+
+Pro-Tip for VS Code
+Since you are mixing Monkey C and PlatformIO (C++/C), VS Code might get confused with extensions.
+I recommend using Multi-Root Workspaces. 
+You can go to File > Add Folder to Workspace... 
+and add the monkeyc_project and platformio_project folders individually. 
+This allows the Monkey C extension and the PlatformIO extension
+ ito run only in their respective directories, preventing build tool conflicts.
+
+Pandoc commands
+ pandoc AeroDoc.docx -o output_file.md

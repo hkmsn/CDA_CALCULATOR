@@ -1,0 +1,22 @@
+# macOS and editor metadata
+.DS_Store
+.vscode/launch.json
+.vscode/settings.json
+
+# Garmin Connect IQ build and simulator output
+bin/
+gen/
+**/mir/
+**/internal-mir/
+*.prg
+*.prg.debug.xml
+*-settings.json
+
+# Private signing key (never commit this)
+developer_key
+
+# Python test artifacts
+__pycache__/
+*.py[cod]
+.venv/
+

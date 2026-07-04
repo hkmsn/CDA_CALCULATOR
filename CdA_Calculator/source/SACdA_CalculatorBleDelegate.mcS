@@ -1,0 +1,100 @@
+import Toybox.BluetoothLowEnergy;
+import Toybox.Lang;
+import Toybox.System;
+
+class SACdA_CalculatorBleDelegate extends BluetoothLowEnergy.BleDelegate {
+    private var _service = BluetoothLowEnergy.stringToUuid("4fafc201-1fb5-459e-8fcc-c5c9c331914b");
+    private var _char    = BluetoothLowEnergy.stringToUuid("beb5483e-36e1-4688-b7f5-ea07361b26a8");
+    private var _device as BluetoothLowEnergy.Device? = null;
+    private var _ready = false;
+
+    function initialize() {
+        BleDelegate.initialize();
+        BluetoothLowEnergy.registerProfile({
+            :uuid => _service,
+            :characteristics => [ { :uuid => _char, :descriptors => [ BluetoothLowEnergy.cccdUuid() ] } ]
+        });
+        BluetoothLowEnergy.setScanState(BluetoothLowEnergy.SCAN_STATE_SCANNING);
+        System.println("BLE Simple: Scanning for UUID " + _service.toString());
+    }
+
+    function onScanResults(scanResults) {
+        for (var result = scanResults.next(); result != null; result = scanResults.next()) {
+            if (result instanceof BluetoothLowEnergy.ScanResult) {
+                var scanResult = result as BluetoothLowEnergy.ScanResult;
+                var uuids = scanResult.getServiceUuids();
+                if (uuids != null) {
+                    for (var u = uuids.next(); u != null; u = uuids.next()) {
+                        if (u.equals(_service)) {
+                            System.println("BLE Simple: Found Match. Pairing...");
+                            BluetoothLowEnergy.setScanState(BluetoothLowEnergy.SCAN_STATE_OFF);
+                            BluetoothLowEnergy.pairDevice(scanResult);
+                            return;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    function onConnectedStateChanged(device, state) {
+        if (state == BluetoothLowEnergy.CONNECTION_STATE_CONNECTED) {
+            System.println("BLE Simple: Connected. Discovering...");
+            _device = device;
+            _ready = false;
+            device.getServices();
+        } else {
+            System.println("BLE Simple: Disconnected. Re-scanning...");
+            _device = null;
+            BluetoothLowEnergy.setScanState(BluetoothLowEnergy.SCAN_STATE_SCANNING);
+        }
+    }
+
+    function attemptRetry() {
+        if (_device != null && !_ready) {
+            var s = _device.getService(_service);
+            if (s != null) {
+                var c = s.getCharacteristic(_char);
+                if (c != null) {
+                    var d = c.getDescriptor(BluetoothLowEnergy.cccdUuid());
+                    if (d != null) {
+                        System.println("BLE Simple: Found Descriptor. Enabling Notify...");
+                        d.requestWrite([0x01, 0x00]b);
+                        _ready = true;
+                    }
+                }
+            } else {
+                _device.getServices(); // Kick discovery
+            }
+        }
+    }
+
+    function onCharacteristicChanged(characteristic, value) {
+        var msg = "";
+        for (var i = 0; i < value.size(); i++) {
+            msg += value[i].toChar();
+        }
+        System.println("BLE Simple MSG: " + msg);
+    }
+
+    // Stubs for App/View compatibility
+    function setView(view) {}
+
+    public function startScanning() as Void {
+        BluetoothLowEnergy.setScanState(BluetoothLowEnergy.SCAN_STATE_SCANNING);
+    }
+
+    public function stopScanning() as Void {
+        BluetoothLowEnergy.setScanState(BluetoothLowEnergy.SCAN_STATE_OFF);
+    }
+
+    public function resetConnection() as Void {
+        _ready = false;
+        BluetoothLowEnergy.setScanState(BluetoothLowEnergy.SCAN_STATE_SCANNING);
+    }
+
+    function onDescriptorWrite(d, s) { System.println("BLE Simple: Descriptor Write Status: " + s); }
+    function onDescriptorRead(d, s, v) {}
+    function onCharacteristicRead(c, s, v) {}
+    function onCharacteristicWrite(c, s) {}
+}

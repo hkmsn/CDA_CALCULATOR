@@ -1,0 +1,30 @@
+<resources>
+	<properties>
+	    <property id="AVG_Duration" type="number">3</property>
+		<property id="bikeWeight"  type="float">8.5</property>
+		<property id="crrValue" type="float">0.0045</property>
+		<property id="use_sensor" type="boolean">false</property>
+
+	</properties>
+
+	<strings>
+	    <string id="AVG_Duration_Title">AVG Duration</string>
+	</strings>
+	
+
+	<settings>
+		<setting propertyKey="@Properties.AVG_Duration" title="@Strings.AVG_Duration_Title">
+	        <settingConfig type="numeric" min="2" max="10" />
+		</setting>
+		<setting propertyKey="@Properties.bikeWeight" title="@Strings.bike_weight_title">
+			<settingConfig type="numeric" min="5.0" max="11.5" />
+		</setting>
+		<setting propertyKey="@Properties.crrValue" title="@Strings.crr_title">
+			<settingConfig type="numeric" min="0.0035 " max="0.0085" />
+		</setting>
+
+		<setting propertyKey="@Properties.use_sensor" title="@Strings.use_sensor_title">
+			<settingConfig type="boolean" />
+		</setting>
+	</settings>
+</resources>
