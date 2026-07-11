@@ -8,6 +8,7 @@
 #include <SPI.h>      // For SD card SPI communication
 #include <SD.h>       // For SD card filesystem
 #include <cmath>      // For std::isnan
+#include "esp_log.h"
 
 // For multi-core support
 #include "freertos/FreeRTOS.h"
@@ -47,6 +48,8 @@ void setup() {
   delay(3000); 
   while(!Serial && millis() < 5000); 
   delay(500);
+
+  esp_log_level_set("BLEScan", ESP_LOG_ERROR);
 
   Serial.println("\n[SYS] Booting ESP32-S3...");
   listPartitions();

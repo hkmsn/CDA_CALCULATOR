@@ -22,6 +22,9 @@ var sensorValue as Float?;
 
     function onStart(state as Dictionary?) as Void {
         refreshSensorSetting();
+        if (Utilities.BLE_DEBUG) {
+            System.println("BLE: App start; external sensor enabled=" + Utilities.USING_SENSOR);
+        }
         if (Utilities.USING_SENSOR) {
             var delegate = ensureBleDelegate();
             if (delegate != null) {
@@ -76,6 +79,7 @@ var sensorValue as Float?;
             }
         } else if (wasUsingSensor) {
             if (_bleDelegate != null) {
+                _bleDelegate.updateAppSensorSettings();
                 _bleDelegate.stopScanning();
             }
         }

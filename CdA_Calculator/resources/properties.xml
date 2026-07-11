@@ -1,9 +1,9 @@
 <resources>
 	<properties>
 	    <property id="AVG_Duration" type="number">3</property>
-		<property id="bikeWeight"  type="float">8.5</property>
-		<property id="crrValue" type="float">0.0045</property>
-		<property id="use_sensor" type="boolean">false</property>
+		<property id="bikeWeight"   type="float">8.5</property>
+		<property id="crrValue"     type="float">0.0045</property>
+		<property id="use_sensor"   type="boolean">true</property>
 
 	</properties>
 

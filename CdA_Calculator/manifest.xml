@@ -4,7 +4,10 @@
     <iq:application entry="CdA_CalculatorApp" id="faa20c8d-0825-4037-bd42-a60b6407ad11" launcherIcon="@Drawables.LauncherIcon" name="@Strings.AppName" type="datafield" minSdkVersion="4.2.0">
         <iq:products>
             <iq:product id="edge1040"/>
+            <iq:product id="edge1050"/>
             <iq:product id="edge540"/>
+            <iq:product id="edge550"/>
+            <iq:product id="edge840"/>
         </iq:products>
         <iq:permissions>
             <iq:uses-permission id="BluetoothLowEnergy"/>

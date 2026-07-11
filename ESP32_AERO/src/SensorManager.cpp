@@ -10,16 +10,23 @@
 
 static const char* TAG = "SensorManager";
 
+static float decodeMS4525PressurePa(int16_t p_counts) {
+    const float spanCounts = MS4525DO_COUNTS_MAX - MS4525DO_COUNTS_MIN;
+    const float spanPsi    = MS4525DO_PRESSURE_MAX_PSI - MS4525DO_PRESSURE_MIN_PSI;
+    float diff_press_psi   = (((float)p_counts - MS4525DO_COUNTS_MIN) * spanPsi / spanCounts) + MS4525DO_PRESSURE_MIN_PSI;
+    return diff_press_psi * PSI_TO_PA;
+}
+
 // Global atomic for ground speed (declared extern in BLEManager.h)
 extern std::atomic<float> g_ble_ground_speed;
 // Global timestamp for last wheel update (declared extern in BLEManager.h)
 extern unsigned long g_lastWheelUpdateMillis;
  
 SensorManager::SensorManager() 
-    : as_filter(0.1f, 1.0f, 0.0f),
+    : as_filter(0.02f, 2.5f, 0.0f),
       _t_last(NAN), _p_last(NAN), _alt_last(NAN), _as_last(NAN), _rho_last(NAN), _gs_last(NAN),
-      _ema_alt(NAN), _alt_alpha(0.15f),
-      _alt_diff_acc(0.0f), _last_recorded_alt(NAN),
+      _ema_alt(NAN), _alt_alpha(0.05f),
+      _alt_diff_acc(0.0f), _last_recorded_alt(NAN), _last_avg_alt(NAN),
       _p_acc(0.0f), _t_acc(0.0f), _alt_acc(0.0f), _as_acc(0.0f), _rho_acc(0.0f), _gs_acc(0.0f),
       _p_n(0), _t_n(0), _alt_n(0), _as_n(0), _rho_n(0), _gs_n(0),
       _i2cInitialized(false), seaLevelPressure(101325.0f), as_offset_pa(0.0f), _i2cMutex(nullptr) {}
@@ -162,22 +169,29 @@ void SensorManager::calibrateSensors() {
     const int as_samples = 40;
     validSamples = 0;
 
+    int staleOrFaultSamples = 0;
+
     for (int i = 0; i < as_samples; i++) {
         if (Wire.requestFrom(MS4525DO_ADDR, 2) == 2) {
             uint8_t b0 = Wire.read();
             uint8_t b1 = Wire.read();
+            uint8_t status = (b0 >> 6) & 0x03;
+            if (status != 0) {
+                staleOrFaultSamples++;
+                delay(20);
+                continue;
+            }
             int16_t p_counts = ((b0 & 0x3F) << 8) | b1;
-            float diff_press_psi = ((((float)p_counts - 1638.4f) * 2.0f) / 13107.2f) - 1.0f;
-            sum += (diff_press_psi * 6894.76f);
+            sum += decodeMS4525PressurePa(p_counts);
             validSamples++;
         }
         delay(20);
     }
     if (validSamples > 0) {
         as_offset_pa = sum / (float)validSamples;
-        ESP_LOGI(TAG, "Airspeed sensor calibrated. Offset: %.2f Pa", as_offset_pa);
+        ESP_LOGI(TAG, "Airspeed sensor calibrated. Offset: %.2f Pa (%d valid, %d stale/fault)", as_offset_pa, validSamples, staleOrFaultSamples);
     } else {
-        ESP_LOGW(TAG, "Airspeed sensor calibration failed: No valid samples obtained.");
+        ESP_LOGW(TAG, "Airspeed sensor calibration failed: No valid samples obtained (%d stale/fault).", staleOrFaultSamples);
     }
 }
 
@@ -254,8 +268,17 @@ bool SensorManager::_readRawAirspeedSensor(float &raw_airspeed_diff_press_pa, fl
     }
 
     int16_t p_counts = ((buffer[0] & 0x3F) << 8) | buffer[1];
-    float diff_press_psi = ((((float)p_counts - 1638.4f) * 2.0f) / 13107.2f) - 1.0f;
-    raw_airspeed_diff_press_pa = (diff_press_psi * 6894.76f) - as_offset_pa; 
+    float raw_pressure_pa = decodeMS4525PressurePa(p_counts);
+    raw_airspeed_diff_press_pa = raw_pressure_pa - as_offset_pa; 
+
+    #ifdef DEBUG_AIRSPEED_RAW
+    static unsigned long lastRawLog = 0;
+    unsigned long now = millis();
+    if (now - lastRawLog >= 1000 || lastRawLog == 0) {
+        lastRawLog = now;
+        Serial.printf("\n[AS] c=%d raw=%.1f off=%.1f corr=%.1f\n", p_counts, raw_pressure_pa, as_offset_pa, raw_airspeed_diff_press_pa);
+    }
+    #endif
 
     int16_t t_counts = (buffer[2] << 8 | buffer[3]) >> 5;
     internal_sensor_temp_c      = ((float)t_counts * 200.0f / 2047.0f) - 50.0f; 
@@ -318,7 +341,6 @@ bool SensorManager::_readBmpData() {
 bool SensorManager::_readAirspeedData() {
     float raw_diff_press_pa = 0;
     float internal_sensor_temp_c = NAN;
-    float raw_as = 0;
     bool success = false; 
 
     if (asAvailable) {
@@ -327,17 +349,30 @@ bool SensorManager::_readAirspeedData() {
             float calc_press = std::isnan(_p_last) ? getSeaLevelPressure() : _p_last;
 
             _rho_last = calculateAirDensity(calc_temp, calc_press);
-            raw_as = (raw_diff_press_pa > 0) ? sqrtf(2.0f * raw_diff_press_pa / _rho_last) : 0.0f;
+            float corrected_press_pa = 0.0f;
+            if (raw_diff_press_pa > AIRSPEED_PRESSURE_DEADBAND_PA) {
+                corrected_press_pa = raw_diff_press_pa;
+                _as_zero_candidate_count = 0;
+            } else if (!std::isnan(_as_last) && _as_last > 0.1f &&
+                       _as_zero_candidate_count < AIRSPEED_ZERO_CONFIRM_SAMPLES) {
+                _as_zero_candidate_count++;
+                return true;
+            } else {
+                _as_zero_candidate_count = AIRSPEED_ZERO_CONFIRM_SAMPLES;
+            }
+
+            float raw_as = (corrected_press_pa > 0.0f) ? sqrtf(2.0f * corrected_press_pa / _rho_last) : 0.0f;
+            getAirspeedData(raw_as, _as_last);
             success = true;
         } else {
             success = false;
         }
     } else {
+        _as_last = NAN;
         _rho_last = NAN;
         success = true; 
     }
 
-    getAirspeedData(raw_as, _as_last);
     return success;
 }
 
@@ -345,9 +380,6 @@ void SensorManager::recordSample(const QueueData &data) {
     if (!std::isnan(data.pressure))    { _p_acc   += data.pressure; _p_n++; }
     if (!std::isnan(data.temp))        { _t_acc   += data.temp; _t_n++; }
     if (!std::isnan(data.altitude))    { 
-        if (!std::isnan(_last_recorded_alt)) {
-            _alt_diff_acc += (data.altitude - _last_recorded_alt);
-        }
         _last_recorded_alt = data.altitude;
         _alt_acc += data.altitude; 
         _alt_n++; 
@@ -368,8 +400,12 @@ void SensorManager::getAveragedTelemetry(QueueData &outData, float &altChange) {
     if (_rho_n > 0) outData.air_rho  = _rho_acc / (float)_rho_n;
     if (_gs_n > 0)  outData.ground_speed = _gs_acc / (float)_gs_n;
 
-    if ((bmpAvailable || bmp280Available)) {
-        altChange = _alt_diff_acc;
+    if ((bmpAvailable || bmp280Available) && _alt_n > 0 && !std::isnan(outData.altitude)) {
+        if (!std::isnan(_last_avg_alt)) {
+            altChange = outData.altitude - _last_avg_alt;
+        }
+        _last_avg_alt = outData.altitude;
+
         if (std::abs(altChange) < ALT_CHANGE_DEADZONE) {
             altChange = 0.0f;
         }
@@ -377,6 +413,7 @@ void SensorManager::getAveragedTelemetry(QueueData &outData, float &altChange) {
 
     if (_alt_n == 0) {
         _last_recorded_alt = NAN;
+        _last_avg_alt = NAN;
     }
 
     _p_acc = _t_acc = _alt_acc = _as_acc = _rho_acc = _gs_acc = _alt_diff_acc = 0.0f;

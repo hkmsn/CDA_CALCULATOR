@@ -8,9 +8,11 @@ import Toybox.SensorHistory;
 module Utilities {
     // Constants
     const DEBUG            = false; // silences the garmin Data Table/updateDebugGarmin
-    const BLE_DEBUG        = true;  // Enables verbose Bluetooth scanning and RX logs
-    var USING_SENSOR       = true;
-    const TESTING_WITH_FAN = true;
+    const BLE_DEBUG        = false;  // Enables verbose Bluetooth scanning and RX logs
+    // Safe startup default: run from Garmin's internal sensors unless the
+    // persisted "use_sensor" setting explicitly enables the BLE sensor.
+    var   USING_SENSOR     = true;
+    const TESTING_WITH_FAN = false;
 
     const AIR_SPEED_INX    = 0;
     const RHO_INX          = 1;

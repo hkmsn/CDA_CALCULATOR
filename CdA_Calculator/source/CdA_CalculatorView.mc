@@ -59,6 +59,7 @@ class CdA_CalculatorView extends WatchUi.DataField {
 	var Unit_font  = Graphics.FONT_XTINY;
 
 	var power as Float = 0.0f;
+	var waitReason as String = "Wait";
 	var sensorParams as Array<Float?>?;
 	var page = 0;
 
@@ -81,6 +82,7 @@ class CdA_CalculatorView extends WatchUi.DataField {
     var garminAvgAltitudeChange     as  Float = 0.0f;
     var altitude                    as  Float = 0.0f;
     var avgVerticalSpeedMS          as  Float = 0.0f; // Average vertical rate of change in m/s
+    private var _hasValidAltitude   as Boolean = false;
     private var _garminAltPrevious  as Float = 0.0f;
 	var altitudePrevious    as Float = 0.0f;
 	var garminAltDelta      as Float = 0.0f;
@@ -141,19 +143,24 @@ class CdA_CalculatorView extends WatchUi.DataField {
 
         // Detect NaN or Null - simulator often starts with null or NaN during transitions
         var rawSpeed = (curSpeed != null && curSpeed == curSpeed) ? (curSpeed as Float) : 0.0f;
-        var rawAlt   = (garminCurAlt != null && garminCurAlt == garminCurAlt) ? (garminCurAlt as Float) : 0.0f;
+        var hasGarminAlt = (garminCurAlt != null && garminCurAlt == garminCurAlt);
+        var rawAlt   = hasGarminAlt ? (garminCurAlt as Float) : altitude;
         speedMSec = rawSpeed; // Update immediately so the UI reflects speed even below the calculation threshold
         power = (curPower != null && curPower == curPower) ? (curPower as Number).toFloat() : 0.0f;
 
         // Guard: If settings changed to disable sensor, ensure we don't try to use stale params
         if (!Utilities.USING_SENSOR) {
             sensorParams = null;
+            sParams = null;
+            _sensorWatchdog = 0;
         }
 
         // Watchdog: Reset to 0 by notifySensorUpdate() in the delegate when real data arrives.
-        _sensorWatchdog++;
+        if (Utilities.USING_SENSOR) {
+            _sensorWatchdog++;
+        }
 
-        if (_sensorWatchdog > 5) {
+        if (Utilities.USING_SENSOR && _sensorWatchdog > 5) {
             if (sensorParams != null) {
                 if (Utilities.BLE_DEBUG) { System.println("BLE: Data timeout (5s). Falling back to GPS."); }
                 sensorParams = null;
@@ -170,12 +177,16 @@ class CdA_CalculatorView extends WatchUi.DataField {
         if (pressurePa != null && pressurePa != pressurePa) { pressurePa = null; }
 
         // Use the 1Hz compute loop as a safe "Timer" to retry BLE handshake if needed
-        _bleRetryTick++;
-        if (_bleRetryTick >= 2) { // Slightly faster retry (2s) helps resolve stalls quicker on Edge 540
-            _bleRetryTick = 0;
-            if (_bleDelegate != null && _bleDelegate has :attemptRetry) {
-                _bleDelegate.attemptRetry();
+        if (Utilities.USING_SENSOR) {
+            _bleRetryTick++;
+            if (_bleRetryTick >= 2) { // Slightly faster retry (2s) helps resolve stalls quicker on Edge 540
+                _bleRetryTick = 0;
+                if (_bleDelegate != null && _bleDelegate has :attemptRetry) {
+                    _bleDelegate.attemptRetry();
+                }
             }
+        } else {
+            _bleRetryTick = 0;
         }
 
         // Debug update must occur before the guard to capture 0.00 stationary speed
@@ -226,20 +237,21 @@ class CdA_CalculatorView extends WatchUi.DataField {
 
         var isTimerRunning = (info.timerState != null && info.timerState == Activity.TIMER_STATE_ON);
 
-        if (samplesCollected < duration) { samplesCollected++; }
-
-        if (samplesCollected == 0) { // Initial state, no previous data
+        if (!_hasValidAltitude && hasGarminAlt) { // Initial state, no previous altitude data
             speedMSecPrevious  = rawSpeed;
             altitudePrevious   = rawAlt;
             _garminAltPrevious = rawAlt;
             altitude           = rawAlt;
+            _hasValidAltitude  = true;
         } else {
-            if (_altKalman != null) {
+            if (hasGarminAlt && _altKalman != null) {
                 altitude = (_altKalman as KalmanFilter).update(rawAlt);
-            } else {
+            } else if (hasGarminAlt) {
                 altitude = rawAlt;
             }
         }
+
+        if (samplesCollected < duration) { samplesCollected++; }
 
         // 3. Update History Buffers and Rolling Sums
 
@@ -370,20 +382,49 @@ class CdA_CalculatorView extends WatchUi.DataField {
         // Ensure avgDragFactor is not zero to avoid "Internal error" (Division by zero)
         var isDragValid = (avgDragFactor > 0.001f); // avgDragFactor is always a Float, no need for null check
 
-        // currentDensity is initialized as Float, but let's be safe
-        var validDensity = (currentDensity != null && currentDensity instanceof Lang.Float && currentDensity > 0.1f);
+        // Accept either numeric representation Connect IQ gives us here.
+        var validDensity = (currentDensity != null && (currentDensity instanceof Lang.Number || currentDensity instanceof Lang.Float) && currentDensity > 0.1f);
 
-        if (samplesCollected >= duration && validDensity && 
-            checkSpeed > speedThreshold && checkAeroPower > 5.0f && isDragValid && isGradientValid) {
-            
-            // Division Guard: prevent divide-by-zero or near-zero crashes
+        if (samplesCollected < duration) {
+            waitReason = "Warm";
+        } else if (!validDensity) {
+            waitReason = "Rho";
+        } else if (checkSpeed <= speedThreshold) {
+            waitReason = "Slow";
+        } else if (checkAeroPower <= 5.0f) {
+            waitReason = "Power";
+        } else if (!isDragValid) {
+            waitReason = "Drag";
+        } else if (!isGradientValid) {
+            waitReason = "Slope";
+        } else {
+            waitReason = "Calc";
+        }
+
+	        if (samplesCollected >= duration && validDensity && 
+	            checkSpeed > speedThreshold && checkAeroPower > 5.0f && isDragValid && isGradientValid) {
+
+	            // Division Guard: prevent divide-by-zero or near-zero crashes
             var denominator = 0.5f * (currentDensity as Float) * avgDragFactor;
             var rawCdA = (denominator > 0.0001f) ? (checkAeroPower / denominator).toFloat() : -2.0f;
-            // Check for NaN or Infinity which happens during sensor/FIT playback transitions
-            CdAValue = (rawCdA != null && rawCdA == rawCdA && rawCdA < 2.0f) ? rawCdA : -2.0f;
-            
-            if (CdAValue == CdAValue && _cdaField != null && isTimerRunning) { 
-                (_cdaField as FitContributor.Field).setData(CdAValue);
+            // Keep invalid sentinels in the UI only; never write them to the FIT field.
+            var isValidCdA = rawCdA == rawCdA && rawCdA > 0.0f && rawCdA < 2.0f;
+
+            if (isValidCdA) {
+                CdAValue = rawCdA;
+                waitReason = "OK";
+                if (_cdaField != null && isTimerRunning) {
+                    (_cdaField as FitContributor.Field).setData(rawCdA);
+                }
+            } else {
+                if (rawCdA == rawCdA && rawCdA >= 2.0f) {
+                    waitReason = "CdA>2";
+                } else if (rawCdA == rawCdA && rawCdA <= 0.0f) {
+                    waitReason = "CdA<0";
+                } else {
+                    waitReason = "CdA";
+                }
+                CdAValue = -2.0f;
             }
         } else {
             CdAValue = (checkSpeed <= speedThreshold) ? -1.0f : -2.0f;
@@ -536,7 +577,7 @@ class CdA_CalculatorView extends WatchUi.DataField {
                 if (samplesCollected < duration) {
                     displayCdA = "W:" + (duration - samplesCollected);
                 } else {
-                    displayCdA = "Wait";
+                    displayCdA = waitReason;
                 }
             }
             
@@ -626,8 +667,12 @@ class CdA_CalculatorView extends WatchUi.DataField {
             System.println(label + " |" + gStr + " |" + sStr + " |" + fStr);
         }
 
-        // Display the current BLE status for easier debugging of the ESP32 link
-        var bleStatus = (sParams == null) ? "DISCONNECTED" : "CONNECTED";
+        // Report the delegate's real state rather than inferring connection
+        // from sensor data, which cannot distinguish pairing from streaming.
+        var bleStatus = Utilities.USING_SENSOR ? "NOT STARTED" : "OFF";
+        if (_bleDelegate != null && _bleDelegate has :getConnectionStatus) {
+            bleStatus = _bleDelegate.getConnectionStatus();
+        }
         System.println("BLE    | " + bleStatus);
 
         System.println("-----------------------------------------------------------");

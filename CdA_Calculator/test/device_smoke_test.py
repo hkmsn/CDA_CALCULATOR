@@ -7,7 +7,7 @@ all supported Garmin devices defined in the project manifest.
 Description:
     This script automates the 'smoke testing' process by:
     1. Resolving the Connect IQ SDK path from VS Code settings.
-    2. Validating the SDK installation integrity (checking api.db size).
+    2. Validating the SDK installation integrity (checking api.db format).
     3. Identifying all target devices from manifest.xml.
     4. Compiling the app for each device using the Java-based monkeybrains compiler.
     5. Launching the Connect IQ Simulator and side-loading the app via monkeydo.
@@ -149,11 +149,7 @@ def get_devices():
         root = tree.getroot()
         ns = {'iq': 'http://www.garmin.com/xml/connectiq'}
         products = root.findall('.//iq:product', ns)
-        all_devices = [p.get('id') for p in products]
-        # Filter to only use Edge 540 as requested
-        if "edge540" in all_devices:
-            return ["edge540"]
-        return all_devices
+        return [p.get('id') for p in products if p.get('id')]
     except Exception as e:
         print(f"Error parsing manifest: {e}")
         return []
@@ -177,8 +173,10 @@ def get_sdk_info():
         Tuple[str, str, str]: (Display string, Absolute compiler path, Raw version string).
     """
     sdk_compiler_version = "Unknown"
+    sdk_version = "Unknown"
     sdk_api_level = "Unknown"
     db_status = ""
+    sdk_root = os.path.dirname(SDK_BIN_PATH) if SDK_BIN_PATH else ""
 
     # Ensure the SDK bin directory is in the PATH for this subprocess call too
     env_patch = {"PATH": f"{SDK_BIN_PATH}:{os.environ.get('PATH', '')}"} if SDK_BIN_PATH else {}
@@ -197,40 +195,51 @@ def get_sdk_info():
             print(f"DEBUG: stdout: {ver_res.stdout.strip()}")
             print(f"DEBUG: stderr: {ver_res.stderr.strip()}")
 
-        # 2. Get API Level from sdk.version file
+        # 2. Read the SDK version. Newer SDK packages may omit sdk.version, but
+        # bin/version.txt is part of the compiler distribution.
         if SDK_BIN_PATH:
-            sdk_root = os.path.dirname(SDK_BIN_PATH)
             version_file = os.path.join(sdk_root, "sdk.version")
-            if os.path.exists(version_file):
-                with open(version_file, 'r') as f:
-                    sdk_api_level = f.read().strip()
+            fallback_version_file = os.path.join(SDK_BIN_PATH, "version.txt")
+            for candidate in (version_file, fallback_version_file):
+                if os.path.exists(candidate):
+                    with open(candidate, 'r') as f:
+                        sdk_version = f.read().strip()
+                    break
             else:
-                print(f"DEBUG: sdk.version file not found at {version_file}")
-                sdk_api_level = "MISSING"
+                sdk_version = sdk_compiler_version
 
-        # 3. Check api.db status
+        # 3. Check api.db status. Despite its name, api.db is a small text
+        # symbol map, not a SQLite database. Its first line is the maximum API
+        # level supported by the SDK (for example, "6.0.0").
         api_db_path = os.path.join(SDK_BIN_PATH, "api.db")
-        if api_db_path and os.path.exists(api_db_path):
-            if os.path.exists(api_db_path):
-                size_mb = os.path.getsize(api_db_path) / (1024 * 1024)
-                db_status = f" | api.db: {size_mb:.2f}MB"
-                if size_mb < 0.5:
-                    db_status += " [!] CORRUPT"
-                # A full 8.x SDK api.db is usually >1MB. Let's use 1MB as a threshold.
-                if size_mb < 1.0:
-                    db_status += " [!] POTENTIALLY CORRUPT (too small)"
+        if os.path.exists(api_db_path):
+            size_kb = os.path.getsize(api_db_path) / 1024
+            try:
+                with open(api_db_path, 'r', encoding='utf-8') as f:
+                    first_line = f.readline().strip()
+                if re.fullmatch(r"\d+\.\d+\.\d+", first_line):
+                    sdk_api_level = first_line
+                    db_status = f" | api.db: {size_kb:.0f}KB [OK]"
+                else:
+                    db_status = f" | api.db: {size_kb:.0f}KB [!] INVALID FORMAT"
+            except (OSError, UnicodeError) as e:
+                db_status = f" | [!] api.db UNREADABLE ({e})"
         else:
             db_status = " | [!] api.db MISSING"
 
-        if "CORRUPT" in db_status or "MISSING" in db_status:
+        if "[!]" in db_status:
             db_status += " -> REINSTALL REQUIRED"
 
-        # Check for devices folder relative to SDK for newer versions
-        devices_dir = os.path.join(os.path.dirname(SDK_BIN_PATH), "share", "devices")
-        if not os.path.exists(devices_dir):
-             db_status += " | [!] share/devices MISSING"
+        # Device definitions are installed globally by Garmin's SDK Manager on
+        # macOS, rather than under each individual SDK.
+        device_dirs = [
+            os.path.join(sdk_root, "share", "devices"),
+            os.path.expanduser("~/Library/Application Support/Garmin/ConnectIQ/Devices"),
+        ]
+        if not any(os.path.isdir(path) for path in device_dirs):
+            db_status += " | [!] device definitions MISSING"
 
-        display_version = f"Compiler: {sdk_compiler_version} (API Level: {sdk_api_level}){db_status}"
+        display_version = f"Compiler: {sdk_compiler_version} (SDK: {sdk_version}, API Level: {sdk_api_level}){db_status}"
         return display_version, os.path.abspath(MONKEYC), sdk_compiler_version # Return compiler version as raw info
 
     except Exception as e:
@@ -335,7 +344,7 @@ def smoke_test_device(device_id, sdk_display_ver, sdk_raw_ver):
             print(f"        This indicates a shallow or corrupted SDK installation. Reinstall steps:")
             print(f"        1. Open the Connect IQ SDK Manager.")
             print(f"        2. Delete and re-download the {sdk_raw_ver} SDK.")
-            print(f"        3. Verify that 'api.db' in the bin directory is larger than 1MB.")
+            print(f"        3. Verify that 'api.db' is readable and begins with an API version.")
             print(f"        5. Check macOS 'Full Disk Access' for the SDK Manager in System Settings.")
             return "SDK_INCOMPATIBLE"
         

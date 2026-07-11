@@ -1,3 +1,18 @@
+ how to synch grouping directories
+
+cd ~/Documents
+
+git clone https://github.com/hkmsn/CDA_CALCULATOR.git
+
+cd CDA_CALCULATOR
+
+rsync -av --delete "/Users/marknelson/Documents/dev/MONKEY_C/CdA_Calculator/" "./CdA_Calculator/"
+
+rsync -av --delete "/Users/marknelson/Documents/dev/ESP32/PlatformIO/Projects/ESP32_AERO/" "./ESP32_AERO/"
+
+
+
+
 # 1. Stage all your current changes
 git add .
 

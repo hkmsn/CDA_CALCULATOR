@@ -75,12 +75,12 @@ void serializeTelemetry(char* outBuf, size_t sz, float as, float rho, float t, f
 
 void serializeBLETelemetry(char* outBuf, size_t sz, float as, float rho, float alt, float alt_ch, bool as_ok, bool bmp_ok) {
     char s_as[8], s_rho[8], s_alt[8], s_alt_ch[8];
-    // Optimized precision for Garmin 20-byte limit
-    // Example: "12.3|1.18|1234|0.1*" = 19 bytes
+    // The BLE layer chunks messages at the 20-byte MTU and the Garmin app
+    // reassembles them, so keep altitude delta precision useful at 4 Hz.
     fmtNA(s_as,     sizeof(s_as),     as,     "%.1f", as_ok);  // 1 decimal
     fmtNA(s_rho,    sizeof(s_rho),    rho,    "%.2f", bmp_ok); // 2 decimals
-    fmtNA(s_alt,    sizeof(s_alt),    alt,    "%.0f", bmp_ok); // Integer
-    fmtNA(s_alt_ch, sizeof(s_alt_ch), alt_ch, "%.1f", bmp_ok); // 1 decimal
+    fmtNA(s_alt,    sizeof(s_alt),    alt,    "%.1f", bmp_ok); // 1 decimal
+    fmtNA(s_alt_ch, sizeof(s_alt_ch), alt_ch, "%.2f", bmp_ok); // 2 decimals
 
     snprintf(outBuf, sz, "%s|%s|%s|%s*", s_as, s_rho, s_alt, s_alt_ch);
 }

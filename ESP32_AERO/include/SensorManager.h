@@ -92,6 +92,7 @@ private:
     int   _p_n = 0,   _t_n = 0,   _alt_n = 0,   _as_n = 0,   _rho_n = 0,   _gs_n = 0;
     float _alt_diff_acc = 0.0f;
     float _last_recorded_alt = NAN;
+    float _last_avg_alt = NAN;
 
     // Persistent filter and last-read state
     float _ema_alt  = NAN;
@@ -101,6 +102,7 @@ private:
     float _as_last  = NAN;
     float _rho_last = NAN;
     float _gs_last  = NAN;
+    int _as_zero_candidate_count = 0;
 
     const float _alt_alpha = 0.2f;
 
