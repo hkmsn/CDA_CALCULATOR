@@ -1,5 +1,7 @@
+# CDA Calculator
+
 [Open the rendered AeroDoc documentation](https://hkmsn.github.io/CDA_CALCULATOR/)
 
+Garmin code is under `CdA_Calculator`.
 
-Garmin code is under Cda_Calculator
-Esp32 code ESP32_AERO using PlatformIO, this can easily be changed.
+ESP32 code is under `ESP32_AERO` and uses PlatformIO.
