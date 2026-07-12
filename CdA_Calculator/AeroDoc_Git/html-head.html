@@ -21,6 +21,17 @@
   tbody tr:nth-child(even) {
     background: #fafafa;
   }
+  thead tr:not(:first-child) th {
+    background: #fff;
+    font-weight: normal;
+  }
+  thead tr:not(:first-child):nth-child(odd) th {
+    background: #fafafa;
+  }
+  td blockquote, th blockquote,
+  td p, th p {
+    margin: 0;
+  }
   img {
     display: block;
     max-width: 100%;
