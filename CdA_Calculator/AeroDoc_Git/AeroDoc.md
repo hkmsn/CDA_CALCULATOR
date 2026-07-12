@@ -4,7 +4,7 @@
 
 This document outlines the development of a CdA estimator for Garmin Edge computers with power meter sensors.
 
-The CdA estimator helps riders optimize position and equipment for maximum speed. Once restricted to wind tunnels or expensive specialized sensors, low-cost technologies from drones and IOT, now enables DIY solutions. These tools offer a practical way to refine performance in real-time.
+CdA estimation helps riders optimize position and equipment for maximum speed. Once restricted to wind tunnels or expensive specialized sensors, low-cost technologies from drones and IOT, now enables DIY solutions. These tools offer a practical way to refine performance in real-time.
 
 The solution scales from basic Garmin headset data to the use higher-precision external sensor data. It uses the most accurate variables available, with built-in fallbacks to less reliable data sources.
 
