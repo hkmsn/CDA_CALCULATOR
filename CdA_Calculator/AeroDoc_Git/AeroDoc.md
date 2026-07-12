@@ -299,13 +299,13 @@ the Garmin app must rebuild them.
 
 The following sensors are supported, using the I2C protocol:
 
-| Sensor | Measures | Main purpose | Approx. cost |
-|---|---|---|---:|
-| MS4525DO | Airspeed | Measures differential Pitot/static pressure | $25–$40 |
-| DHT20 + BMP280 | Pressure, temperature, humidity, and air density | Estimates altitude and air density | $4–$8 |
-| BMP390 | Pressure, temperature, and air density | Provides high-precision altitude and air-density measurements | $10–$15 |
-| Power meter | Rider power | Measures total power entering the system | $200–$1,000 |
-| Wheel-speed magnet | Ground speed | Provides accurate short-timescale speed and is preferred over GPS when available | $15–$30 |
+| Sensor | Data | Use in CdA calculation | Cost (USD) |
+|:---|:---|:---|---:|
+| MS4525DO | Airspeed | Pitot/static differential pressure | 25–40 |
+| DHT20 + BMP280 | Pressure, temperature, humidity | Altitude and air density | 4–8 |
+| BMP390 | Pressure and temperature | High-precision altitude and air density | 10–15 |
+| Power meter | Rider power | Total power entering the system | 200–1,000 |
+| Wheel-speed magnet | Ground speed | Stable short-timescale speed; preferred over GPS | 15–30 |
 
 *Note: Power Meters and Wheel Magnet Sensors support both ANT+ and BLE*
 
