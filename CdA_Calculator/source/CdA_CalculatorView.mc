@@ -244,7 +244,11 @@ class CdA_CalculatorView extends WatchUi.DataField {
             altitude           = rawAlt;
             _hasValidAltitude  = true;
         } else {
-            if (hasGarminAlt && _altKalman != null) {
+            // Garmin altitude is already filtered by the head unit. Applying a
+            // second, slow Kalman filter in internal-only mode makes vertical
+            // speed lag badly; after a descent it can still report a negative
+            // climb value (#) after the rider has started climbing.
+            if (hasGarminAlt && sParams != null && _altKalman != null) {
                 altitude = (_altKalman as KalmanFilter).update(rawAlt);
             } else if (hasGarminAlt) {
                 altitude = rawAlt;
@@ -296,7 +300,13 @@ class CdA_CalculatorView extends WatchUi.DataField {
             if (instantAltDelta != instantAltDelta || abs(instantAltDelta) > Utilities.IMPOSSIBLE_CLIMB_RATE) { 
                 instantAltDelta = 0.0f;
             }
-            garminAltDelta = lowPassFilter(instantAltDelta, garminAltDelta);
+            // The history buffer below already averages this value across the
+            // selected duration. Do not smooth Garmin-only altitude a second
+            // time, because the extra EMA preserves the previous slope and can
+            // display downhill power while the rider is climbing.
+            garminAltDelta = (sParams != null)
+                ? lowPassFilter(instantAltDelta, garminAltDelta)
+                : instantAltDelta;
 
             // 1-second Fusion Logic: Fuse instantaneous Garmin delta with instantaneous Sensor delta
             var sensorDelta = (sParams != null && sParams.size() > Utilities.ALT_DIFF_INX) ? sParams[Utilities.ALT_DIFF_INX] : null;

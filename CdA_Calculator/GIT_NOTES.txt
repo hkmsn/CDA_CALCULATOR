@@ -91,3 +91,33 @@ git status
 git add AeroDoc.html CdA_Calculator ESP32_AERO
 git commit -m "Update CdA calculator, ESP32 firmware, and documentation"
 git push
+
+cd ~/Documents
+git clone https://github.com/hkmsn/CDA_CALCULATOR.git
+cd CDA_CALCULATOR
+
+rsync -av --delete \
+  --exclude='.git/' \
+  --exclude='.DS_Store' \
+  --exclude='developer_key' \
+  "/Users/marknelson/Documents/dev/MONKEY_C/CdA_Calculator/" \
+  "./CdA_Calculator/"
+
+rsync -av --delete \
+  --exclude='.git/' \
+  --exclude='.pio/' \
+  --exclude='.DS_Store' \
+  "/Users/marknelson/Documents/dev/ESP32/PlatformIO/Projects/ESP32_AERO/" \
+  "./ESP32_AERO/"
+
+cp "/Users/marknelson/Documents/dev/MONKEY_C/CdA_Calculator/AeroDoc.html" \
+   "./AeroDoc.html"
+
+git status
+
+git add AeroDoc.html CdA_Calculator ESP32_AERO
+git commit -m "Update CdA calculator, ESP32 firmware, and documentation"
+git push
+
+https://hkmsn.github.io/CDA_CALCULATOR/
+https://github.com/hkmsn/CDA_CALCULATOR.git
