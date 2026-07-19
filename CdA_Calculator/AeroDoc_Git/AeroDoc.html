@@ -862,10 +862,8 @@ bike.</p></li>
 </ul>
 <h2 id="physical-design-esp32"><strong>Physical Design
 ESP32</strong></h2>
-<h3
-id="the-grovestandard-uses-the-following-note-m5-allows-redefinition-of-gpios">The
-Grovestandard uses the following, note M5 allows redefinition of
-GPIOs:</h3>
+<p>The Grove standard uses the following, note M5 allows redefinition of
+GPIOs:</p>
 <h3
 id="pin-1-scl-yellowserial-clock-line-for-timing-synchronization.">Pin 1
 SCL YellowSerial Clock line for timing synchronization.</h3>
@@ -1125,16 +1123,17 @@ id="accelerometer-gyroscope-hypothetical---in-test-only">Accelerometer +
 Gyroscope (hypothetical - in test only)</h3>
 <p>ACCEL is a motion sensor.. With ADXL 345 and ACC, 3-axis speed can be
 derived.</p>
-<p>• <strong>3-Axis Measurement:</strong> Measures acceleration in the
-X, Y, and Z directions.</p>
-<p>• <strong>Sensitivity:</strong> Measures up to ± 16g with high 13-bit
-resolution, can detect tilt changes of less than 1.0°.</p>
-<p>• <strong>Digital Outputs:</strong> 16-bit output.</p>
-<p>• <strong>Communication:</strong> <strong>I2C</strong> or
-<strong>SPI</strong> communication protocols.</p>
-<p>• <strong>Special Features:</strong> Includes built-in motion
-sensing, such as detecting tap/double-tap events, general activity, and
-inactivity</p>
+<ul>
+<li><p>3-Axis Measurement: Measures acceleration in the X, Y, and Z
+directions.</p></li>
+<li><p>Sensitivity: Measures up to ± 16g with high 13-bit resolution,
+can detect tilt changes of less than 1.0°.</p></li>
+<li><p>Digital Outputs: 16-bit output.</p></li>
+<li><p>Communication: I2C or SPI communication protocols.</p></li>
+<li><p>Special Features: Includes built-in motion sensing, such as
+detecting tap/double-tap events, general activity, and
+inactivity</p></li>
+</ul>
 <p><img src="./media/image16.png"
 style="width:2.47619in;height:2.89764in" /></p>
 <p>I've tested 1 US accelerometer product; the results are compatible
@@ -1194,16 +1193,6 @@ style="width:3.37546in;height:3.63293in" /></th>
 <tbody>
 </tbody>
 </table>
-<h3 id="ai-camera">AI Camera</h3>
-<p>Grove AI Vision Module V2 is an MCU-based vision AI module powered by
-Arm Cortex-M55 &amp; Ethos-U55. It supports TensorFlow and PyTorch
-frameworks and is compatible with Arduino IDE. With the SenseCraft AI
-algorithm platform, trained ML models can be deployed to the sensor
-without the need for coding. It features a standard CSI interface, an
-onboard digital microphone and an SD card slot, making it highly
-suitable for various embedded AI vision projects.</p>
-<p><img src="./media/image21.png"
-style="width:2.22222in;height:2.05556in" /></p>
 <h2 id="section-1"></h2>
 <h2 id="section-2"></h2>
 <h2 id="appendix-04-esp32-logging-and-persistence-workflow">Appendix 0‑4
@@ -1356,13 +1345,13 @@ Controller Hardware</h2>
 are dual core processors, (Cs are single core, which the code supports).
 One core handles sensor, the other manages BLE communications.
 M5Stamp-S3A costs around 10 USD.</p>
-<p><img src="./media/image22.png"
+<p><img src="./media/image21.png"
 style="width:3.05903in;height:2.60396in" /></p>
 <h3 id="section-3"></h3>
 <h3 id="m5stamp-grove-breakout-board">M5Stamp Grove Breakout Board</h3>
 <p>The expansion board adds a battery holder, and simplifies the
 connection of I2C sensors with Grove ports. Around 6 USD.</p>
-<p><img src="./media/image23.png"
+<p><img src="./media/image22.png"
 style="width:4.0495in;height:3.86636in" /></p>
 <p>(Only the 16340 fits)</p>
 <h3 id="m5stack-capsules">M5Stack Capsules</h3>
@@ -1370,7 +1359,7 @@ style="width:4.0495in;height:3.86636in" /></p>
 built around the <strong>M5StampS3</strong>. It’s the most suitable for
 building the home solution, it would need a 2 I2C adapter, and will
 minimize all wiring and control. (Not shown, as mine hasn't arrived</p>
-<p><img src="./media/image24.png"
+<p><img src="./media/image23.png"
 style="width:3.57426in;height:3.52808in" /></p>
 <p>Features:</p>
 <p><strong>Enclosure:</strong> A compact, protective plastic shell that
