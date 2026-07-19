@@ -403,20 +403,18 @@ tested this one).</p>
 <p><img src="./media/image4.png"
 style="width:6.75347in;height:3.37708in" /></p>
 <h2 id="garmin-only">Garmin-only</h2>
-<h2
-id="garmins-os-collects-raw-metrics-processes-them-in-internal-filters-and-populates-a-single-snapshot-structure-the-activity.info-object-which-is-refreshed-at-once-per-second-1-hz.">Garmin’s
-OS collects raw metrics, processes them in internal filters, and
-populates a single snapshot structure: the <em>Activity.Info</em>
-object, which is refreshed at once per second (1 Hz). </h2>
+<p>Garmin’s OS collects raw metrics, processes them in internal filters,
+and populates a single snapshot structure: the <em>Activity.Info</em>
+object, which is refreshed at once per second (1 Hz).</p>
 <p>Using only the Garmin headset, Garmin's sensor data are combined with
-the external Power Meter readings, and configuration settings.</p>
-<ul>
-<li><p><strong>Dynamic Configuration</strong>: reads settings from
-Garmin Connect IQ, (e.g.: AVG_Duration, Bike Weight, Body Weight in
-Profile), that change model's parameters without recompiling.</p></li>
-<li><p><strong>Metrics</strong>:  Buffers are kept for key data for user
-defined duration:</p></li>
-</ul>
+the external Power Meter readings, and configuration settings, the
+following list the main approach:</p>
+<p><strong>Dynamic Configuration</strong>: reads settings from Garmin
+Connect IQ, (e.g.: Averaging Duration, Bike Weight, Body Weight from
+Garmin Profile), that change model's parameters without recompiling.</p>
+<p><strong>Buffered Metrics</strong>:  Buffers are kept for key data for
+Averaging Duration, without Sensor Hub they are used directly, with it,
+readings are fused:</p>
 <ul>
 <li><p><strong>Altitude Change</strong></p>
 <ul>
@@ -424,10 +422,10 @@ defined duration:</p></li>
 filter.</p></li>
 <li><p>Garmin altitude change is processed by an Exponential Moving
 Average (EMA), where the "responsiveness" of the EMA is calculated
-dynamically based on user-defined duration - the average in seconds to
-be reported.</p>
+dynamically based on user-defined Averaging Duration - the average in
+seconds to be reported.</p>
 <ul>
-<li><p>Stored in an array of size duration, and avgVerticalSpeedMS
+<li><p>Stored in an array of size duration, the avgVerticalSpeedMS is
 calculated by summing over duration, and dividing by duration, this is
 used in climb power calculation. When sensors are available the value is
 augmented with sensor data.</p></li>
@@ -435,43 +433,27 @@ augmented with sensor data.</p></li>
 </ul></li>
 </ul>
 <ul>
-<li><p><strong>Speed</strong></p>
-<ul>
-<li><p>speedAvgMSec uses Simple Moving Average (SMA) for
-duration</p></li>
-<li><p>currentSpeedSqDiff used to estimate Kinetic Energy power:</p>
-<ul>
-<li><p>A Jitter Threshold is applied so likely noise are zeroed out
-before being stored .</p></li>
-<li><p>currentSpeedSqDiff uses Simple Moving Average (SMA) for
-duration.</p></li>
-</ul></li>
-</ul></li>
+<li><p><strong>speedAvgMSec</strong> uses Simple Moving Average (SMA)
+for duration</p></li>
+<li><p><strong>currentSpeedSqDiff</strong> used to estimate Kinetic
+Energy gain/loss power using SMA for duration. A Jitter Threshold is
+applied so likely noise are zeroed out before being stored.</p></li>
+<li><p><strong>Drag factor</strong> (speedAirSensorMSec *
+speedAirSensorMSec) * speedMSec with no sensors, speedAirSensorMSec =
+speedMSec. It uses a SMA for duration.</p></li>
 </ul>
 <ul>
-<li><p>Drag factor (speedAirSensorMSec * speedAirSensorMSec) * speedMSec
-with no sensors, speedAirSensorMSec = speedMSec. It uses a Simple Moving
-Average (SMA) over duration.</p></li>
+<li><p><strong>Air Density</strong> Info.ambientPressure  and
+Toybox.SensorHistory is accessed to get latest temperature, then used to
+calculate air density.</p></li>
 </ul>
-<ul>
-<li><p><strong>Air Density</strong></p>
-<ul>
-<li><p>Info.ambientPressure  and Toybox.SensorHistory is accessed to get
-latest temperature, these are used to calculate air density.Without
-Sensor Hub input these data are used in CdA calculations.</p></li>
-</ul></li>
-</ul>
-<ul>
-<li><p><strong>Logging:</strong></p>
-<ul>
-<li><p>FIT Recording: CdA values are recorded into the
-session's FIT file</p></li>
-</ul></li>
-</ul>
+<p><strong>Logging:</strong> FIT Recording: CdA values are recorded into
+the session's FIT file</p>
 <h2 id="garmin-esp32-sensor-hub">Garmin + ESP32 Sensor Hub</h2>
-<p>The Garmin-only interface with the ESP32 based sensor hub; the key
-additional sensor is airspeed. Altitude information from pressure sensor
-is also provided that augments/ enhances Garmin's.</p>
+<p>The Garmin-only interface is improved by data from ESP32 based sensor
+hub; the key additional sensor is airspeed. Altitude information from
+pressure sensor is also provided that augments/ enhances Garmin's
+internal barometric/GPS estimation.</p>
 <p>Garmin Connect IQ applications act as Generic Attribute Profile,
 (GATT), clients only. Message payload is limited to 20 bytes. Peripheral
 devices, (GATT Servers), must chop any payload into packets and send
@@ -512,9 +494,9 @@ Clocks</a>.</p></li>
 <th><blockquote>
 <p>Airspeed</p>
 </blockquote></th>
-<th style="text-align: left;"><blockquote>
-<p>Differential pressure, 14-bit resolution, I2C interface, low
-power.</p>
+<th><blockquote>
+<p>Pitot Tube based, differential pressure, 14-bit resolution, I2C
+interface, low power.</p>
 </blockquote></th>
 <th><blockquote>
 <p>Airspeed: Measures the difference between Pitot and Static
@@ -531,7 +513,7 @@ pressure.</p>
 <p>+</p>
 <p>Air Density</p>
 </blockquote></th>
-<th style="text-align: left;"><blockquote>
+<th><blockquote>
 <p>Combined Humidity (DHT20) and Barometric Pressure/Temp (BMP280).</p>
 </blockquote></th>
 <th><blockquote>
@@ -613,7 +595,7 @@ corresponding real-time drag values. Collected data could train a model,
 which is then used as classifier for good positions, the VL53L5CX has
 been tested and discussed in Appendix. An AI camera with depth
 perception is also an option. Logging on SD is mandatory with these
-approaches.</p>
+approaches. Hypothetical diagram:</p>
 <p><img src="./media/image5.png"
 style="width:6.75347in;height:4.50556in" /></p>
 <p><strong><br />
@@ -624,11 +606,13 @@ id="logical-relationship-between-garmin-and-sensor-hub"><strong>Logical
 Relationship between Garmin and Sensor Hub</strong></h3>
 <p><img src="./media/image6.png"
 style="width:6.98871in;height:5.22747in" /></p>
-<h2 id="sensor-hub"><strong>Sensor Hub</strong></h2>
-<p>Sensor Hub is based the ESP32-S3, a dual-core architecture micro
-controller. Sensor sampling, and communication and storage tasks, can be
-decoupled. See <a href="#appendix---micro-controller-hardware">Appendix
-0‑6 - Micro Controller Hardware</a>.</p>
+<h2 id="sensor-hub-architecture"><strong>Sensor Hub
+Architecture</strong></h2>
+<p>Sensor Hub is based the ESP32-S3 M5Stamp S3A, a dual-core
+architecture micro controller. Sensor sampling, and communication and
+storage tasks, can be decoupled by exploiting the dual cores. See <a
+href="#appendix---micro-controller-hardware">Appendix 0‑6 - Micro
+Controller Hardware</a>.</p>
 <p>Below is the ESP32-S3 workflow:</p>
 <h3 id="esp32-s3-boot-sequence"><strong>ESP32-S3 Boot
 Sequence</strong></h3>
@@ -677,7 +661,7 @@ second 20 Hz.</p>
 Filter<strong> </strong></p></li>
 <li><p>Altitude uses an Exponential Moving Average (EMA to remove
 noise.)</p></li>
-<li><p>Density rolling average calculated</p></li>
+<li><p>Air Density rolling average calculated</p></li>
 </ul>
 <blockquote>
 <p><strong>Queueing:</strong>  values are put on the Sensor Queue. this
@@ -700,10 +684,10 @@ BLE_PUBLISH_INTERVAL as the starting point to avoid jumping, a 5cm dead
 zone is applied.</p></li>
 </ul>
 <blockquote>
-<p><strong>External Sensor Sync:</strong> Collects data from external
-sensors e.g.: Power Meter, Wheel Road speed magnet, this could allow,
-the hub to bypass the Garmin headset completely, using a display, or
-publish to website.</p>
+<p><strong>External Sensor Sync:</strong> Collects data from BLE
+external sensors e.g.: Power Meter, Wheel Road speed magnet, this could
+allow, the hub to bypass the Garmin headset completely, using a display,
+or publish to website. e.g.:</p>
 <p><em>Ground Speed</em>: acts as a BLE Client to a remote cycling speed
 sensor, calculating ground speed based on wheel revolutions (implemented
 but not used - testing too much hassle, originally considered passing
@@ -850,20 +834,21 @@ and not is the current Git code, as both need more testing.</p>
 <h2 id="sensor-placement">Sensor Placement</h2>
 <p>Use these criteria:</p>
 <ul>
-<li><p>Pitot tube must not be is the wash of the front wheel.</p></li>
+<li><p>Pitot tube must not be in the wash of the front wheel.</p></li>
 <li><p>Pitot tube must not be so close to the frame and rider, that
 rider position changes, (which we are analyzing), alters the airflow
 around the sensor.</p></li>
 <li><p>The stem to should be rigid enough that its movements are not
-generating its own airflow.</p></li>
+generating its own airflow features.</p></li>
 <li><p>The pressure sensor should not be in direct sunlight.</p></li>
-<li><p>If using the accelerometers its position must be stable on the
+<li><p>If using an accelerometer, its position must be stable on the
 bike.</p></li>
 </ul>
 <h2 id="physical-design-esp32"><strong>Physical Design
 ESP32</strong></h2>
-<p>The Grove standard uses the following, in I2C, note M5 allows
-redefinition of GPIOs, so UART is also an option:</p>
+<p>The sensor connections use I2C, with Grove connectors note M5 allows
+redefinition of GPIOs, so UART is also an option (e.g.: TOF
+sensors):</p>
 <h3
 id="pin-1-scl-yellowserial-clock-line-for-timing-synchronization.">Pin 1
 SCL YellowSerial Clock line for timing synchronization.</h3>
@@ -874,9 +859,10 @@ id="pin-3-vcc-red-power-supply-typically-dual-compatible-with-3.3v-or-5v.">Pin
 3 VCC Red Power supply (typically dual-compatible with 3.3V or 5V).</h3>
 <h3 id="pin-4-gnd-black-common-ground-reference.">Pin 4 GND Black Common
 ground reference.</h3>
-<p>Pin order matters, as sensors use differing HY2.0-4P, JST SH /GH pin
-standards, which have different pin order, plug sizes and pitches.
-Suggest working back from the ESP32 to the sensor requirement.</p>
+<p>Pin order matters, as sensors use differing pin standards, (e.g.:
+HY2.0-4P, JST SH /GH), which have different pin orders, plug sizes and
+pitches. Suggest working back from the ESP32 Grove to the sensor
+requirement.</p>
 <p><img src="./media/image8.png"
 style="width:6.75347in;height:6.28681in" /></p>
 <h2 id="working-prototypes">Working Prototypes</h2>
@@ -994,9 +980,9 @@ cheapest/simplest solution. Read Garmin's install docs. Flashing the
 dongle may require going back a few versions to get it working</p>
 <p>Referencing BLE in anyway in simulator code without a dongle, will
 bring the simulator down, these errors can't be trapped in Try/Catch,
-(at least the mac). If coding/testing without BLE the BLE code must be
-by-passed. The following parameters in the CdA_Utilities.mc are relevant
-to development.</p>
+(at least on the mac). If coding/testing without BLE the BLE code must
+be by-passed. The following parameters in the CdA_Utilities.mc are
+relevant to development.</p>
 <p>const DEBUG = true;</p>
 <p>const BLE_DEBUG = true;</p>
 <p>var USING_SENSOR = true;</p>
@@ -1028,16 +1014,16 @@ device to synchronize the timing of the data transfer.</p></li>
 <p>Sensors supporting I2C will have these pins, but the order and
 connector sizes are not standard:</p>
 <ul>
-<li><p>Grove standard 2.0mm pitch connector, also called HY2.0 - with
-buckle.</p></li>
+<li><p>Grove standard 2.0mm pitch connector, also called HY2.0 -
+with/without buckle.</p></li>
 <li><p>Qwiic and STEMMA QT standard uses 4-pin JST SH connector with a
 1.0mm pitch, the VCC pin always needs checking</p></li>
 <li><p>1.25mm pitch JST 4-pin connector, some 1.25 pitch connectors call
-themselve SH.</p></li>
+themselves SH.</p></li>
 </ul>
 <p>All connections need checking, convertors are not generic as pin
-layouts change, (hint: stay Grove, when possible). Wire splicing is the
-solution, unless you want to buy 1000 connectors on Alibaba.</p>
+layouts change, (hint: stay Grove, when possible). Wire splicing or
+adapter wires, with pin rearrangement, is the solution.</p>
 <h3 id="airspeed-sensor-ms4525do"><strong>Airspeed Sensor
 MS4525DO</strong> </h3>
 <p>A pitot-static tube measures velocity by comparing total pressure
@@ -1275,7 +1261,6 @@ varying times within that 1-second Garmin window. In a perfect
 "unlikely" world the situation would be:</p>
 <p><img src="./media/image21.png"
 style="width:6.75347in;height:1.50139in" /></p>
-<p>The Timeline Mapping (The Phase Shift)</p>
 <p>In all cases, 4 Hz packets will be "out of phase" with Garmin's 1 HZ
 sensor data, note the Garmin works a 1HZ, sensors could operate at much
 higher sampling rates; 4 Hz is the publishing rate for Sensor Hub BLE,
@@ -1320,21 +1305,18 @@ building the home solution, it would need a 2 I2C adapter, and will
 minimize all wiring and control. (Not shown, as mine hasn't arrived</p>
 <p><img src="./media/image24.png"
 style="width:3.57426in;height:3.52808in" /></p>
-<p>Features:</p>
-<p><strong>Enclosure:</strong> A compact, protective plastic shell that
-houses the electronics, making it more durable for outdoor
-environments.</p>
-<p><strong>Battery &amp; Power:</strong> Has an internal 250mAh lithium
-battery and built-in charging circuit.</p>
-<p><strong>Grove Port:</strong> A HY2.0-4P connector to external I2C
+<p>Useful for Project Features:</p>
+<p><strong>Enclosure:</strong> durable for outdoor environments.</p>
+<p><strong>Battery &amp; Power:</strong> internal 250mAh lithium battery
+and built-in charging circuit.</p>
+<p><strong>Grove Port:</strong> HY2.0-4P connector to external I2C
 units, such as I2C breakout adapter.</p>
 <p><strong>Buttons:</strong> Includes a multi-function button for input
 and a reset button accessed through the shell – this saves command
-programing in Gramin, e.g.: start/stop logs.</p>
-<p><strong>BMI270:</strong> built in gyroscope and acceleration
-sensor.</p>
-<p><strong>Timing:</strong> This module has a clock, so debugging output
-can have actual time stamps, without a specialized sensor, other
-solutions time stamp, is the duration since logging started.</p>
+programing in Garmin, e.g.: start/stop logs.</p>
+<p><strong>BMI270:</strong> built in acceleration sensor.</p>
+<p><strong>Timing:</strong> module has a clock, so debugging/detailed
+log output can have actual time stamps, without a specialized sensor,
+other solutions time stamp, is the duration since logging started.</p>
 </body>
 </html>
