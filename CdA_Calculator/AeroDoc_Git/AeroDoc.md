@@ -476,7 +476,7 @@ Use these criteria:
 
 ## **Physical Design ESP32**
 
-### The Grovestandard uses the following, note M5 allows redefinition of GPIOs:
+The Grove standard uses the following, note M5 allows redefinition of GPIOs:
 
 ### Pin 1 SCL YellowSerial Clock line for timing synchronization.
 
@@ -643,15 +643,15 @@ BMP390 measures temperature for internal compensation, this calibrated temperatu
 
 ACCEL is a motion sensor.. With ADXL 345 and ACC, 3-axis speed can be derived.
 
-• **3-Axis Measurement:** Measures acceleration in the X, Y, and Z directions.
+- 3-Axis Measurement: Measures acceleration in the X, Y, and Z directions.
 
-• **Sensitivity:** Measures up to ± 16g with high 13-bit resolution, can detect tilt changes of less than 1.0°.
+- Sensitivity: Measures up to ± 16g with high 13-bit resolution, can detect tilt changes of less than 1.0°.
 
-• **Digital Outputs:** 16-bit output.
+- Digital Outputs: 16-bit output.
 
-• **Communication:** **I2C** or **SPI** communication protocols.
+- Communication: I2C or SPI communication protocols.
 
-• **Special Features:** Includes built-in motion sensing, such as detecting tap/double-tap events, general activity, and inactivity
+- Special Features: Includes built-in motion sensing, such as detecting tap/double-tap events, general activity, and inactivity
 
 <img src="./media/image16.png" style="width:2.47619in;height:2.89764in" />
 
@@ -691,12 +691,6 @@ The Sipeed A010 TOF camera has also be tested, this has a 100X100 output and cos
 
 | <img src="./media/image19.png" style="width:3.28542in;height:3.58503in" /> | <img src="./media/image20.png" style="width:3.37546in;height:3.63293in" /> |
 |----|----|
-
-### AI Camera
-
-Grove AI Vision Module V2 is an MCU-based vision AI module powered by Arm Cortex-M55 & Ethos-U55. It supports TensorFlow and PyTorch frameworks and is compatible with Arduino IDE. With the SenseCraft AI algorithm platform, trained ML models can be deployed to the sensor without the need for coding. It features a standard CSI interface, an onboard digital microphone and an SD card slot, making it highly suitable for various embedded AI vision projects.
-
-<img src="./media/image21.png" style="width:2.22222in;height:2.05556in" />
 
 ## 
 
@@ -840,7 +834,7 @@ All great toys.
 
 The M5Stamp-S3A supports 2.4 GHz Wi-Fi and Bluetooth 5 (BLE). These are dual core processors, (Cs are single core, which the code supports). One core handles sensor, the other manages BLE communications. M5Stamp-S3A costs around 10 USD.
 
-<img src="./media/image22.png" style="width:3.05903in;height:2.60396in" />
+<img src="./media/image21.png" style="width:3.05903in;height:2.60396in" />
 
 ### 
 
@@ -848,7 +842,7 @@ The M5Stamp-S3A supports 2.4 GHz Wi-Fi and Bluetooth 5 (BLE). These are dual cor
 
 The expansion board adds a battery holder, and simplifies the connection of I2C sensors with Grove ports. Around 6 USD.
 
-<img src="./media/image23.png" style="width:4.0495in;height:3.86636in" />
+<img src="./media/image22.png" style="width:4.0495in;height:3.86636in" />
 
 (Only the 16340 fits)
 
@@ -856,7 +850,7 @@ The expansion board adds a battery holder, and simplifies the connection of I2C 
 
 The **M5Stack Capsule** is a pill-shaped development kit built around the **M5StampS3**. It’s the most suitable for building the home solution, it would need a 2 I2C adapter, and will minimize all wiring and control. (Not shown, as mine hasn't arrived
 
-<img src="./media/image24.png" style="width:3.57426in;height:3.52808in" />
+<img src="./media/image23.png" style="width:3.57426in;height:3.52808in" />
 
 Features:
 
