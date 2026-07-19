@@ -862,8 +862,8 @@ bike.</p></li>
 </ul>
 <h2 id="physical-design-esp32"><strong>Physical Design
 ESP32</strong></h2>
-<p>The Grove standard uses the following, note M5 allows redefinition of
-GPIOs:</p>
+<p>The Grove standard uses the following, in I2C, note M5 allows
+redefinition of GPIOs, so UART is also an option:</p>
 <h3
 id="pin-1-scl-yellowserial-clock-line-for-timing-synchronization.">Pin 1
 SCL YellowSerial Clock line for timing synchronization.</h3>
@@ -874,8 +874,9 @@ id="pin-3-vcc-red-power-supply-typically-dual-compatible-with-3.3v-or-5v.">Pin
 3 VCC Red Power supply (typically dual-compatible with 3.3V or 5V).</h3>
 <h3 id="pin-4-gnd-black-common-ground-reference.">Pin 4 GND Black Common
 ground reference.</h3>
-<p>Pin order matters, as sensors use different JST SH /GH pin standards,
-and others, which have different pin order, plug sizes and pitches.</p>
+<p>Pin order matters, as sensors use differing HY2.0-4P, JST SH /GH pin
+standards, which have different pin order, plug sizes and pitches.
+Suggest working back from the ESP32 to the sensor requirement.</p>
 <p><img src="CdA_Calculator/AeroDoc_Git/media/image8.png"
 style="width:6.75347in;height:6.28681in" /></p>
 <h2 id="working-prototypes">Working Prototypes</h2>
@@ -906,8 +907,8 @@ style="width:3.06473in;height:3.69178in" /></th>
 </tbody>
 </table>
 <h1 id="appendices">Appendices</h1>
-<h2 id="appendix-accounting-for-rolling-mass">Appendix ‑ Accounting for
-Rolling Mass</h2>
+<h2 id="appendix-0-accounting-for-rolling-mass">Appendix 0‑ Accounting
+for Rolling Mass</h2>
 <p>To account for wheel inertia, the total kinetic energy should include
 translational and rotational components, as all acceleration consumes
 energy:</p>
@@ -993,9 +994,9 @@ cheapest/simplest solution. Read Garmin's install docs. Flashing the
 dongle may require going back a few versions to get it working</p>
 <p>Referencing BLE in anyway in simulator code without a dongle, will
 bring the simulator down, these errors can't be trapped in Try/Catch,
-(at least the mac). If coding/testing without BLE the relevant code must
-be by-passed. The following parameters in the CdA_Utilities.mc are
-relevant to development.</p>
+(at least the mac). If coding/testing without BLE the BLE code must be
+by-passed. The following parameters in the CdA_Utilities.mc are relevant
+to development.</p>
 <p>const DEBUG = true;</p>
 <p>const BLE_DEBUG = true;</p>
 <p>var USING_SENSOR = true;</p>
@@ -1004,11 +1005,11 @@ relevant to development.</p>
 <p>BLE_DEBUG - Prints contents if DEBUG in BLE connection area</p>
 <p>USING_SENSOR -- When "false" all code connecting to BLE is
 bypassed.</p>
-<p>TESTING_WITH_FAN -- When "true" assume simulation data generated or a
-FIT file is being played, with connected airspeed sensor that's pointed
-at a fan, the value of Air Speed used in the application becomes the
-((ground speed from FIT file/Sim) + Sensor Input); this gives a more
-realistic simulation.</p>
+<p>TESTING_WITH_FAN -- When "true" assume simulation data generated/ FIT
+file is being played, with connected airspeed sensor that's pointed at a
+fan, the value of Air Speed used in the application becomes the ((ground
+speed from FIT file/Sim) + Sensor Input); this gives a more realistic
+simulation, so the ground and airspeed will differ.</p>
 <h3 id="esp32-development-vs-code-platformio">ESP32 development: VS Code
 + PlatformIO</h3>
 <p>The code is all built with PlatformIO for the ESP32 development –
@@ -1031,7 +1032,8 @@ connector sizes are not standard:</p>
 buckle.</p></li>
 <li><p>Qwiic and STEMMA QT standard uses 4-pin JST SH connector with a
 1.0mm pitch, the VCC pin always needs checking</p></li>
-<li><p>1.25mm pitch JST 4-pin connector</p></li>
+<li><p>1.25mm pitch JST 4-pin connector, some 1.25 pitch connectors call
+themselve SH.</p></li>
 </ul>
 <p>All connections need checking, convertors are not generic as pin
 layouts change, (hint: stay Grove, when possible). Wire splicing is the
@@ -1079,10 +1081,10 @@ BMP280</strong></h3>
 humidity, and atmospheric pressure data. It has the AHT20
 (humidity/temp) and BMP280 (pressure/temp). Theoretical Sensitivity
 Limit of approx 11cm, practical 1m. The AHT20 provides temperature
-accuracy <span class="math inline">\(\left( \text{(} \pm
-\,{0.3}^{\circ}C\text{)} \right)\)</span> compared to the BMP280<span
-class="math inline">\(\ (\text{(} \pm 0.5C\text{)}\ \)</span>to <span
-class="math inline">\(\text{(±1C)).}\)</span></p>
+accuracy <span class="math inline">\(\left( \pm \,{0.3}^{\circ}C
+\right)\)</span> compared to the BMP280<span
+class="math inline">\(\  \pm 0.5C\ \)</span>to <span
+class="math inline">\(\text{±1C}\)</span></p>
 <table style="width:89%;">
 <colgroup>
 <col style="width: 41%" />
@@ -1257,9 +1259,9 @@ loop and BLE stream do not natuarally sync, they run on separate
 internal clocks, that is two independent systems:</p>
 <ol type="1">
 <li><p><strong>BLE Wireless Clock (Asynchronous):</strong> ESP32 code
-controls the interval time - ESP32 don't an internal clock. Interval is
-set tp 250 milliseconds, (4 Hz, 1/4 second) it fires a data packet, the
-Garmin BLE hardware catches it and runs the function
+controls the interval time - ESP32 doesnt have internal clock. Interval
+is set tp 250 milliseconds, (4 Hz, 1/4 second) it fires a data packet,
+the Garmin BLE hardware catches it and runs the function
 onCharacteristicChanged(). This happens completely at random relative to
 what the device is doing.</p></li>
 <li><p><strong>App UI Clock (Synchronous):</strong> Garmin Connect IQ
