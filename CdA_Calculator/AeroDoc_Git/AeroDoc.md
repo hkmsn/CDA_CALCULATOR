@@ -476,7 +476,7 @@ Use these criteria:
 
 ## **Physical Design ESP32**
 
-The Grove standard uses the following, note M5 allows redefinition of GPIOs:
+The Grove standard uses the following, in I2C, note M5 allows redefinition of GPIOs, so UART is also an option:
 
 ### Pin 1 SCL YellowSerial Clock line for timing synchronization.
 
@@ -486,7 +486,7 @@ The Grove standard uses the following, note M5 allows redefinition of GPIOs:
 
 ### Pin 4 GND Black Common ground reference.
 
-Pin order matters, as sensors use different JST SH /GH pin standards, and others, which have different pin order, plug sizes and pitches.
+Pin order matters, as sensors use differing HY2.0-4P, JST SH /GH pin standards, which have different pin order, plug sizes and pitches. Suggest working back from the ESP32 to the sensor requirement.
 
 <img src="./media/image8.png" style="width:6.75347in;height:6.28681in" />
 
@@ -512,7 +512,7 @@ Two prototypes below, its possible to make more streamlined solutions, (using th
 
 # Appendices
 
-## Appendix ‑ Accounting for Rolling Mass
+## Appendix 0‑ Accounting for Rolling Mass
 
 To account for wheel inertia, the total kinetic energy should include translational and rotational components, as all acceleration consumes energy:
 
@@ -563,7 +563,7 @@ Use a standard install.
 
 To work with BLE the Garmin Simulator needs the Nordic nRF52-DK or nRF52840 Dongle, and associated software. Practically the dongle is the cheapest/simplest solution. Read Garmin's install docs. Flashing the dongle may require going back a few versions to get it working
 
-Referencing BLE in anyway in simulator code without a dongle, will bring the simulator down, these errors can't be trapped in Try/Catch, (at least the mac). If coding/testing without BLE the relevant code must be by-passed. The following parameters in the CdA_Utilities.mc are relevant to development.
+Referencing BLE in anyway in simulator code without a dongle, will bring the simulator down, these errors can't be trapped in Try/Catch, (at least the mac). If coding/testing without BLE the BLE code must be by-passed. The following parameters in the CdA_Utilities.mc are relevant to development.
 
 const DEBUG = true;
 
@@ -579,7 +579,7 @@ BLE_DEBUG - Prints contents if DEBUG in BLE connection area
 
 USING_SENSOR -- When "false" all code connecting to BLE is bypassed.
 
-TESTING_WITH_FAN -- When "true" assume simulation data generated or a FIT file is being played, with connected airspeed sensor that's pointed at a fan, the value of Air Speed used in the application becomes the ((ground speed from FIT file/Sim) + Sensor Input); this gives a more realistic simulation.
+TESTING_WITH_FAN -- When "true" assume simulation data generated/ FIT file is being played, with connected airspeed sensor that's pointed at a fan, the value of Air Speed used in the application becomes the ((ground speed from FIT file/Sim) + Sensor Input); this gives a more realistic simulation, so the ground and airspeed will differ.
 
 ### ESP32 development: VS Code + PlatformIO
 
@@ -599,7 +599,7 @@ Sensors supporting I2C will have these pins, but the order and connector sizes a
 
 - Qwiic and STEMMA QT standard uses 4-pin JST SH connector with a 1.0mm pitch, the VCC pin always needs checking
 
-- 1.25mm pitch JST 4-pin connector
+- 1.25mm pitch JST 4-pin connector, some 1.25 pitch connectors call themselve SH.
 
 All connections need checking, convertors are not generic as pin layouts change, (hint: stay Grove, when possible). Wire splicing is the solution, unless you want to buy 1000 connectors on Alibaba.
 
@@ -622,7 +622,7 @@ The MS4525DO is a differential pressure I2C sensor, show in two form factors bel
 
 ### **Altitude sensors AHT20+ BMP280**
 
-AHT20 + BMP280 module is a I2C sensor board providing temperature, humidity, and atmospheric pressure data. It has the AHT20 (humidity/temp) and BMP280 (pressure/temp). Theoretical Sensitivity Limit of approx 11cm, practical 1m. The AHT20 provides temperature accuracy $`\left( \text{(} \pm \,{0.3}^{\circ}C\text{)} \right)`$ compared to the BMP280$`\ (\text{(} \pm 0.5C\text{)}\`$to $`\text{(±1C)).}`$
+AHT20 + BMP280 module is a I2C sensor board providing temperature, humidity, and atmospheric pressure data. It has the AHT20 (humidity/temp) and BMP280 (pressure/temp). Theoretical Sensitivity Limit of approx 11cm, practical 1m. The AHT20 provides temperature accuracy $`\left( \pm \,{0.3}^{\circ}C \right)`$ compared to the BMP280$`\  \pm 0.5C\`$to $`\text{±1C}`$
 
 | <img src="./media/image13.png" style="width:2.53465in;height:2.56447in" /> | <img src="./media/image14.png" style="width:2.24227in;height:2.24724in" /> |
 |----|----|
@@ -744,7 +744,7 @@ The system accepts real-time control via the Serial Terminal or BLE Characterist
 
 Assume the ESP32 sends packets at 4Hz. The Garmin 1 Hz Activity.Info loop and BLE stream do not natuarally sync, they run on separate internal clocks, that is two independent systems:
 
-1.  **BLE Wireless Clock (Asynchronous):** ESP32 code controls the interval time - ESP32 don't an internal clock. Interval is set tp 250 milliseconds, (4 Hz, 1/4 second) it fires a data packet, the Garmin BLE hardware catches it and runs the function onCharacteristicChanged(). This happens completely at random relative to what the device is doing.
+1.  **BLE Wireless Clock (Asynchronous):** ESP32 code controls the interval time - ESP32 doesnt have internal clock. Interval is set tp 250 milliseconds, (4 Hz, 1/4 second) it fires a data packet, the Garmin BLE hardware catches it and runs the function onCharacteristicChanged(). This happens completely at random relative to what the device is doing.
 
 2.  **App UI Clock (Synchronous):** Garmin Connect IQ virtual machine controls this clock. Every 1,000 milliseconds (1 Hz, 1 second), it pauses background processes, updates the master Activity.Info object with the latest GPS, speed, and power metrics, and executes compute(info) function.
 
