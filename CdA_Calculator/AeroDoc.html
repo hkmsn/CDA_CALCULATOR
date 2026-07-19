@@ -1257,10 +1257,11 @@ loop and BLE stream do not natuarally sync, they run on separate
 internal clocks, that is two independent systems:</p>
 <ol type="1">
 <li><p><strong>BLE Wireless Clock (Asynchronous):</strong> ESP32 code
-controls this clock. Its set 250 milliseconds, (4 Hz, 1/4 second) it
-fires a data packet, the Garmin BLE hardware catches it and runs the
-function onCharacteristicChanged(). This happens completely at random
-relative to what the device is doing.</p></li>
+controls the interval time - ESP32 don't an internal clock. Interval is
+set tp 250 milliseconds, (4 Hz, 1/4 second) it fires a data packet, the
+Garmin BLE hardware catches it and runs the function
+onCharacteristicChanged(). This happens completely at random relative to
+what the device is doing.</p></li>
 <li><p><strong>App UI Clock (Synchronous):</strong> Garmin Connect IQ
 virtual machine controls this clock. Every 1,000 milliseconds (1 Hz, 1
 second), it pauses background processes, updates the master
@@ -1268,75 +1269,31 @@ Activity.Info object with the latest GPS, speed, and power metrics, and
 executes compute(info) function.</p></li>
 </ol>
 <p>Because these cycles are decoupled, the 4 Hz packets will land at
-varying times within that 1-second Garmin window. The 4 Hz packets will
-be slightly "out of phase" with Garmin's 1 Hz data snapshot.</p>
-<p>Timeline (ms): 0ms 250ms 500ms 750ms 1000ms (1 Second)</p>
-<p>▼ ▼ ▼ ▼ ▼</p>
-<p>ESP32 BLE: [P1] [P2] [P3] [P4] [P5]...</p>
-<p>Garmin App: ──────────────────────────────────────────►
-[compute(info) Loop]</p>
-<p>• Updates speed/power</p>
-<p>• Refreshes screen</p>
-<p>• Runs math formulas</p>
+varying times within that 1-second Garmin window. In a perfect
+"unlikely" world the situation would be:</p>
+<p><img src="AeroDoc_Git/media/image21.png"
+style="width:6.75347in;height:1.50139in" /></p>
 <p>The Timeline Mapping (The Phase Shift)</p>
-<p>tWhen compute(info) triggers on the 1-second mark, it pulls the
-latest metrics that Garmin's internal sensor processor has calculated
-for that second (e.g., your current power from an ANT+ meter or speed
-from a hub sensor). The sync looks like this:</p>
-<ul>
-<li><p><strong>0ms:</strong> Garmin updates info variables and runs your
-compute() loop.</p></li>
-<li><p><strong>210ms:</strong> <strong>Packet 1</strong> arrives from
-ESP32. (Stores inside your app memory).</p></li>
-<li><p><strong>460ms:</strong> <strong>Packet 2</strong> arrives from
-ESP32. (Stores inside your app memory).</p></li>
-<li><p><strong>710ms:</strong> <strong>Packet 3</strong> arrives from
-ESP32. (Stores inside your app memory).</p></li>
-<li><p><strong>960ms:</strong> <strong>Packet 4</strong> arrives from
-ESP32. (Stores inside your app memory).</p></li>
-<li><p><strong>1000ms:</strong> Garmin triggers the next compute(info)
-loop.</p></li>
-</ul>
-<p>When that 1000ms mark hits, Packet 4 is only 40 milliseconds old, but
-Packet 1 is 790 milliseconds old, this creates data skew alignment
-error. Two synchronization strategies:</p>
+<p>In all cases, 4 Hz packets will be "out of phase" with Garmin's 1 HZ
+sensor data, note the Garmin works a 1HZ, sensors could operate at much
+higher sampling rates; 4 Hz is the publishing rate for Sensor Hub BLE,
+the actual sensor read rates are higher.</p>
 <p><strong>Strategy A: The Centered Block Average (the one
 used)</strong></p>
-<p>Assume the average of those 4 packets represents the true
-environmental state of that specific elapsed second.</p>
-<p>When compute(info) runs, you take the average/sum fo alt diff, of the
-4 buffered packets and pair it directly with the single
-info.currentPower and info.currentSpeed value. This smooths out the
-phase shift.</p>
-<p>Code snippet</p>
-<p>// Inside compute(info)</p>
-<p>if (packetBuffer.size() &gt; 0) {</p>
-<p>var averageSensorValue = calculateBufferAverage(); // Smooths P1, P2,
-P3, P4</p>
-<p>packetBuffer = []; // Clear buffer for next second</p>
-<p>// Sync achieved: 1-second average vs 1-second Garmin snapshot</p>
-<p>var currentCdA = calculateCdA(info.currentPower, info.currentSpeed,
-averageSensorValue);</p>
-<p>}</p>
+<p>Assume the average of those 4 packets represents the true sensor's
+state for that Garmin elapsed second. When compute(info) runs, take the
+average/sum of the 4 BLE buffered packets and pair them directly with
+the single info.currentPower, info.currenitSpeed altitude change values.
+This smooths the differences within the 1Hz Garmin cycle.</p>
 <p><strong>Strategy B: Time-Stamping via System Clocks (one considered
 but too hard - as a note)</strong></p>
 <p>Tag each incoming 4 Hz packet with the exact millisecond it arrived
-using Garmin's system timer.</p>
-<p>Code snippet</p>
-<p>// Inside BLE callback (runs 4x a second)</p>
-<p>function onCharacteristicChanged(characteristic, value) {</p>
-<p>var rawMetric = value.decodeNumber(Lang.NUMBER_FORMAT_FLOAT, {:offset
-=&gt; 0});</p>
-<p>var arrivalTime = System.getTimer(); // Returns system time in
-milliseconds</p>
-<p>// Store both the value time it landed</p>
-<p>packetBuffer.add([rawMetric, arrivalTime]);</p>
-<p>}</p>
-<p>When compute(info) fires, look at the timestamps of 4 Hz data to see
-how close they were to the 1 Hz execution boundary, allowing data
-weighting or discarding packets that arrived too close to the edge of
-the clock cycle. Too hard to play with and consumes lots of processing -
-the simulator also has trouble.</p>
+using Garmin's system timer. When compute(info) fires, look at the
+timestamps of 4 Hz data to see how close they were to the 1 Hz execution
+boundary, allowing data weighting or discarding packets that arrived too
+close to the edge of the clock cycle. Too hard to play with and consumes
+lots of processing - the simulator also has trouble to get this
+working.</p>
 <h2 id="appendix---micro-controller-hardware">Appendix ‑ - Micro
 Controller Hardware</h2>
 <p>All great toys.</p>
@@ -1345,13 +1302,13 @@ Controller Hardware</h2>
 are dual core processors, (Cs are single core, which the code supports).
 One core handles sensor, the other manages BLE communications.
 M5Stamp-S3A costs around 10 USD.</p>
-<p><img src="AeroDoc_Git/media/image21.png"
+<p><img src="AeroDoc_Git/media/image22.png"
 style="width:3.05903in;height:2.60396in" /></p>
 <h3 id="section-3"></h3>
 <h3 id="m5stamp-grove-breakout-board">M5Stamp Grove Breakout Board</h3>
 <p>The expansion board adds a battery holder, and simplifies the
 connection of I2C sensors with Grove ports. Around 6 USD.</p>
-<p><img src="AeroDoc_Git/media/image22.png"
+<p><img src="AeroDoc_Git/media/image23.png"
 style="width:4.0495in;height:3.86636in" /></p>
 <p>(Only the 16340 fits)</p>
 <h3 id="m5stack-capsules">M5Stack Capsules</h3>
@@ -1359,7 +1316,7 @@ style="width:4.0495in;height:3.86636in" /></p>
 built around the <strong>M5StampS3</strong>. It’s the most suitable for
 building the home solution, it would need a 2 I2C adapter, and will
 minimize all wiring and control. (Not shown, as mine hasn't arrived</p>
-<p><img src="AeroDoc_Git/media/image23.png"
+<p><img src="AeroDoc_Git/media/image24.png"
 style="width:3.57426in;height:3.52808in" /></p>
 <p>Features:</p>
 <p><strong>Enclosure:</strong> A compact, protective plastic shell that
