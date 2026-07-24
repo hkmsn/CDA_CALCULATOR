@@ -224,80 +224,89 @@
 <header id="title-block-header">
 <h1 class="title">AeroDoc CdA Calculator</h1>
 </header>
-<p><strong>Calculating Bicycle CdA (Coefficient of Drag
-Area)</strong></p>
+<p><strong>Calculating Bicycle CdA</strong></p>
+<p><strong>(Coefficient of drag Area)</strong></p>
 <h1 id="introduction">Introduction</h1>
-<p>This document outlines the development of a CdA estimator centered on
+<p>This document covers the development of a CdA estimator centered on
 an ESP32 microcontroller-based sensor hub, integrated with Garmin
-cycling computers and power-meter data.</p>
-<p>The ESP32 sensor hub is the core of the solution. It collects,
-manages, and processes data from high-precision external sensors
-required for effective CdA estimation. This helps riders optimize their
+cycling computers and power-meter data. At higher speeds wind resistance
+is the most important bottleneck. CdA monitoring helps riders optimize
 position and equipment for maximum speed.</p>
-<p>Once limited to wind tunnels and expensive specialized equipment, CdA
-estimation is now accessible through affordable technologies developed
-for drones and the Internet of Things. Combined with the ESP32’s
-flexible connectivity and processing capabilities, these technologies
-make practical, real-time DIY aerodynamic analysis possible.</p>
-<p>The solution can operate using basic data from a Garmin head unit,
-but its full capability comes from higher-precision sensor data managed
-by the ESP32 hub. It automatically uses the most accurate variables
-available while retaining Garmin and other less precise data sources as
-fallbacks.</p>
-<p>We solve the real-time <em>Bicycle Equations of Motion</em>, because
-cyclists are flexible bodies on a bike; shifting positions alter both
-frontal area and shape.  To account for this, we combine the Coefficient
-of Drag (Cd) and Area (A) into a single metric—CdA</p>
+<p>The ESP32 sensor hub is the core of the solution. It collects,
+manages, and processes data from external sensors.</p>
+<p>Once limited to wind tunnels and expensive specialized equipment,
+commerical models start at 1000USD, CdA estimation is now accessible
+through affordable technologies developed for drones and the Internet of
+Things. Combined with the ESP32’s flexible connectivity and processing
+capabilities, these technologies make practical, real-time DIY
+aerodynamic analysis possible.</p>
+<p>The solution is designed to operate using basic data from a Garmin
+head unit, but its full capability comes from higher-precision sensor
+data managed by the ESP32 hub. It automatically uses the most accurate
+variables available while retaining Garmin and other less precise data
+sources as fallbacks.</p>
+<p><strong><u>Summary of forcing acting on the cyclist:</u></strong></p>
 <p><img src="./media/image1.png"
+style="width:6.75347in;height:3.67986in" /></p>
+<p>We need solve the <em>Bicycle Equations of Motion</em> in near real
+time; because cyclists bodies are flexible, unlike aircraft/cars,
+shifting body position alters both frontal area and areodynamic
+characteristics.  So we combine the Coefficient of Drag (Cd) and Area
+(A) into a single metric—CdA.</p>
+<p><img src="./media/image2.png"
 style="width:6.98958in;height:3.80903in" /></p>
 <p>CdA estimation relies on categorizing power consumption components,
-isolating the drag, then breaking out the CdA. CdA values are saved to
-the FIT file with standard Garmin metrics. Granular metrics and raw
-calculations are stored in the external sensor log when connected and
-configured.</p>
+isolating the drag, then breaking out the CdA.</p>
 <p><strong><u>GARMIN Head Unit</u></strong></p>
-<p><img src="./media/image2.png"
+<p>This is ride-time display unit, the measures are independently
+useful. CdA is and stable, within narrow ranges, e.g.: slow speeds, on
+climbs, or rapid speed changes, make it uninteresting.</p>
+<p><img src="./media/image3.png"
 style="width:2.89109in;height:3.87686in" /></p>
 <p>This is an entertaining programming problem, and an introduction to
-sensor technologies, I’ve become a fan of the M5Stack (<a
-href="https://m5stack.com/">https://m5stack.com/</a>) products, easy to
-understand and connect. The boring or technical bits are in the
-appendixes.</p>
+sensor technologies, M5Stack (<a
+href="https://m5stack.com/">https://m5stack.com/</a>) products. The
+boring or technical bits are in the appendixes.</p>
 <h2 id="the-power-balance-equation"><strong>The Power Balance
 Equation</strong></h2>
-<p>All physics models are effective; an effective model intentionally
-ignores microscopic complexities to describe the macroscopic behavior;
-it uses insufficient or incomplete details and over simplifications that
-become invalid in some circumstances.</p>
-<p>The CdA estimator uses a physics-based power balance equation to
-isolate aerodynamic drag from other <strong>power</strong> consuming
+<p>All physics models are effective; effective models intentionally
+ignore complexities to describe macroscopic behavior, using
+over-simplifications that are insufficient in some circumstances.</p>
+<p>The CdA estimator uses a power balance equation to isolate
+aerodynamic drag from other <strong>power</strong> consuming
 factors:</p>
 <p><span class="math display">\[P_{Total} = P_{Drag} + P_{Rolling} +
 P_{Climb} + P_{Kinetic\ Energy\ \ \ } + P_{Drive\ train\ \ \
 }\]</span></p>
 <p><span class="math inline">\(\mathbf{P}_{\mathbf{total\
-}}\mathbf{:}\)</span> Power measured by a meter, usually at the crank,
-hub or pedals should be two sided.</p>
-<p><span class="math inline">\(\mathbf{Drag}\)</span> : Power required
-to overcome air resistance, must be isolated for <span
-class="math inline">\(CdA\ \)</span>calculation, in general for a bike,
-the Coefficient of Drag, Cd, and Area, A, can't be separated. Appendix
-XX discusses a sensor approach to estimate A.</p>
+}}\mathbf{:}\)</span> Power is the rate of energy usage, e.g. a 10 Watt
+bulb uses the same energy in 10 minutes, that a 100 Watt bulb uses in
+one. A competent amateur cyclist might hold 200 Watts for an hour, a
+professional 450 Watts. It’s usually measured at the crank or
+pedals.</p>
+<h4
+id="mathbfdrag-power-required-to-overcome-air-resistance-must-be-isolated-for-cda-calculation-for-a-bike-the-coefficient-of-drag-cd-and-area-a-cant-be-separated.-see-in-appendix-for-discussion-estimating-the-a-in-cda---lidar-tof-or-ai-camera"><span
+class="math inline">\(\mathbf{Drag}\)</span> : Power required to
+overcome air resistance, must be isolated for <span
+class="math inline">\(CdA\ \)</span>calculation, for a bike, the
+Coefficient of Drag, Cd, and Area, A, can't be separated. (See in
+appendix for discussion Estimating the "A" in CdA - Lidar, ToF or AI
+camera)</h4>
 <p><em><strong>Rolling</strong>:</em> Rolling resistance power
 consumption; the rubber contact patch deforms and recovers, but doesn't
-return all the deform energy. The basic formula is: <span
+return all the energy. The basic formula is: <span
 class="math inline">\(\mathbf{C}_{\mathbf{rr}}\mathbf{\cdot}\mathbf{m}\mathbf{\cdot}\mathbf{g}\mathbf{\cdot}\mathbf{v}_{\mathbf{road}}\)</span>
-Rolling depends on slope, however, this will be ignored. Clinchers with
-latex tube <span class="math inline">\(\mathbf{C}_{\mathbf{rr}}\)</span>
-<span class="math inline">\(\approx \ \)</span>0.0035 – 0.0045 at 36
-Km/Hr. and 90Kg combined bike rider mass around 35 Watts. <span
+Normal tires with latex tubes <span
+class="math inline">\(\mathbf{C}_{\mathbf{rr}}\)</span> <span
+class="math inline">\(\approx \ \)</span>0.0035 – 0.0045 at 36 Km/Hr.
+and 90Kg combined bike rider mass, the loss is around 35 Watts. <span
 class="math inline">\(\mathbf{C}_{\mathbf{rr}}\)</span> values are
 available for major tire brands.</p>
 <p><em><strong>Climb:</strong></em> Power consumed or contributed by
 gravitational potential energy, PE, change rate. <span
 class="math inline">\(m\ .g.\ \frac{d}{dt}\nabla Alt\)</span> where
-<span class="math inline">\(\mathbf{\nabla}Alt\)</span> is the change in
-altitude. It can be estimated with barometer (or accelerometer) sensors.
+<span class="math inline">\(\mathbf{\nabla}Alt\)</span> , (altitude
+change). It can be estimated with barometer (or accelerometer) sensors.
 Small errors are significant, e.g.: 90Kg combined bike rider mass,
 climbing 0.5 m at 5 m/s (18 km/h), a 10% gradient, would consume 220
 Watts alone, much higher contributions are possible in descents. The
@@ -369,8 +378,7 @@ lower than dry air 0% humidity, resulting in CdA will appear roughly
 <strong>:</strong> Airspeed in direction of travel. Tail winds and yaw
 are not considered when present, air speed may be under-estimated. Basic
 sensors have reliable lower reading ranges of roughly 10–15 km/h (3–4
-m/s), below 10 km/h, the sensor may drift up randomly even if the bike
-is still.</p>
+m/s), below 10 km/h, is random.</p>
 <p><span class="math inline">\(\mathbf{v}_{\mathbf{road}}\)</span>.
 Ground speed, the Garmin GPS can be 3 seconds or drop out, so wheel
 magnet measurements are desirable. (using Speed and Velocity
@@ -396,7 +404,7 @@ unreliable.</p></li>
 Sensor Hub via Bluetooth Low Energy (BLE) messages.</p></li>
 </ul>
 <h3 id="user-interface">User Interface</h3>
-<p><img src="./media/image3.png"
+<p><img src="./media/image4.png"
 style="width:6.75347in;height:6.39861in" /></p>
 <p>Garmin headsets can’t easily send commands or data to the sensor hub,
 e.g.: send the defined, wheel circumference or recorded rider mass.
@@ -404,7 +412,7 @@ However, it’s possible by attaching BLE messages to button presses. (not
 tested this one).</p>
 <h3 id="cda-graph">CdA Graph</h3>
 <p>Example test data stream</p>
-<p><img src="./media/image4.png"
+<p><img src="./media/image5.png"
 style="width:6.75347in;height:3.37708in" /></p>
 <h2 id="garmin-only">Garmin-only</h2>
 <p>Garmin’s OS collects raw metrics, processes them in internal filters,
@@ -412,7 +420,7 @@ and populates a single snapshot structure: the <em>Activity.Info</em>
 object, which is refreshed at once per second (1 Hz).</p>
 <p>Using only the Garmin headset, Garmin's sensor data are combined with
 the external Power Meter readings, and configuration settings, the
-following list the main approach:</p>
+following lists the main features:</p>
 <p><strong>Dynamic Configuration</strong>: reads settings from Garmin
 Connect IQ, (e.g.: Averaging Duration, Bike Weight, Body Weight from
 Garmin Profile), that change model's parameters without recompiling.</p>
@@ -607,7 +615,7 @@ BLE.</p>
 <h3
 id="logical-relationship-between-garmin-and-sensor-hub"><strong>Logical
 Relationship between Garmin and Sensor Hub</strong></h3>
-<p><img src="./media/image5.png"
+<p><img src="./media/image6.png"
 style="width:6.98871in;height:5.22747in" /></p>
 <h2 id="sensor-hub-architecture"><strong>Sensor Hub
 Architecture</strong></h2>
@@ -629,8 +637,7 @@ to check for stuck lines or missing pull-ups before initializing
 the Wire bus at 100kHz.</p>
 <blockquote>
 <p><strong>Sensor Discovery:</strong> Scans the I2C bus for the MS4525DO
-Airspeed sensor and the BMP390/280/ AHT20 sensors, and others if
-added.</p>
+Airspeed sensor and the BMP390/280/ AHT20 sensors, etc.</p>
 <p><strong>Calibration:</strong> </p>
 </blockquote>
 <ul>
@@ -655,14 +662,14 @@ Acquisition Workflow (sensor Task on Core 0)</strong></h3>
 <p>This task handles the sensor reads:</p>
 <blockquote>
 <p><strong>Sampling:</strong> Sampling is set by sensor, e.g.: 50 milli
-second 20 Hz.</p>
+seconds (20 Hz).</p>
 <p><strong>Smoothing:</strong> </p>
 </blockquote>
 <ul>
 <li><p>Airspeed raw data is passed through a<strong> </strong>Kalman
 Filter<strong> </strong></p></li>
 <li><p>Altitude uses an Exponential Moving Average, EMA, to reduce
-noise.</p></li>
+noise</p></li>
 <li><p>Air Density rolling average calculated</p></li>
 </ul>
 <blockquote>
@@ -681,20 +688,15 @@ and Telemetry Workflow (Telemetry Task on Core 1)</strong></h3>
 <li><p>Create rolling average for point samples, e.g.: airspeed, air
 density, others</p></li>
 <li><p>Calculate accumulated altitude change (Climb/Descent) by
-comparing consecutive Altitudes, it uses the last sample from previous
-BLE_PUBLISH_INTERVAL as the starting point to avoid jumping, a 5cm dead
-zone is applied.</p></li>
+comparing consecutive Altitudes, and fusion on Capsule, it uses the last
+sample from previous BLE_PUBLISH_INTERVAL as the starting point to avoid
+jumping, a 5cm dead zone is applied.</p></li>
 </ul>
 <blockquote>
 <p><strong>External Sensor Sync:</strong> Collects data from BLE
 external sensors e.g.: Power Meter, Wheel Road speed magnet, this could
 allow, the hub to bypass the Garmin headset completely, using a display,
-or publish to website. e.g.:</p>
-<p><em>Ground Speed</em>: acts as a BLE Client to a remote cycling speed
-sensor, calculating ground speed based on wheel revolutions (implemented
-but not used - testing too much hassle, originally considered passing
-the complete calculation to Garmin, so it would become only a display
-unit.)</p>
+or publish to website. e.g.: Ground Speed magnet</p>
 <p><strong>Formatting:</strong> A subset of data are formatted into a
 pipe-delimited, "|", string, terminated by "*". Garmin logic is required
 to handle deformed BLE messages, as they can "go missing".</p>
@@ -710,12 +712,11 @@ useful in development.</p></li>
 </ul>
 <blockquote>
 <p>For local logging HH:MM: SS|Data| is added for all data items.
-Standard ESP32 records elapsed time from session start, not actual time,
-which would require a timing chip.</p>
-<p>This log provides additional analysis, it's available in the
-development environment and can be downloaded from a SD card.</p>
-<p>When connected to the development Serial Monitor a command menu is
-available:</p>
+Standard ESP32 records elapsed time from session start, not actual time.
+Capsule implementation uses actual time.</p>
+<p>This log is available in the development environment and can be
+downloaded from a SD card from working run. When connected to the
+development Serial Monitor a command menu is available:</p>
 </blockquote>
 <table style="width:57%;">
 <colgroup>
@@ -745,20 +746,17 @@ available:</p>
 <h3 id="sensor-hub-logical-flow"><strong>Sensor Hub Logical
 Flow</strong></h3>
 <blockquote>
-<p><img src="./media/image6.png"
+<p><img src="./media/image7.png"
 style="width:6.41667in;height:8.30556in" /></p>
 </blockquote>
-<p>Ground speed is received by Sensor Hub, but not used on the M5Stack,
-power meter data could also be used, thereby providing a standalone
-option. There is the potential to calculate the whole drag component on
-the ESP32, if wheel size is added via a UI (e.g., using the M5Stick)</p>
+<p>Ground speed is received by Sensor Hub, but not used in current
+solution - there as POC, power meter data could also be used, thereby
+providing a Garmin independent. solution.</p>
 <h3 id="sensor-fusion">Sensor Fusion</h3>
-<p>Sensor fusion combines data from multiple sensors to get result that
-is more accurate/reliable, than a single sensor. Sensors operate with
-different accuracy, potentially measuring complementary observables. The
-"fusion" of sensor result can produce more accurate overall
-measurements. Fusion uses smoothing and Kalman filters, (see Internet
-for many explanations), provide the best results. Some sensor
+<p>Sensor fusion combines data from multiple sensors for a
+accurate/reliable measure. Sensors operate with different accuracy,
+potentially measuring complementary observables. Fusion uses smoothing
+and Kalman filters, (see Internet for many explanations). Some sensor
 combinations:</p>
 <table>
 <colgroup>
@@ -830,11 +828,12 @@ trend 100%.</p></li>
 </tr>
 </tbody>
 </table>
-<p>Accelerometer can be used to add accuracy in Kinetic energy
+<p>An accelerometer can be used to add accuracy in Kinetic energy
 calculations and Altitude change, these are both second order in time,
-and not is the current Git code, as both need more testing.</p>
+it’s in the Git code for Capsule.</p>
 <h2 id="sensor-placement">Sensor Placement</h2>
-<p>Use these criteria:</p>
+<p>Use these criteria to fix the device to the bike, after making an
+appropriate attachment container:</p>
 <ul>
 <li><p>Pitot tube must not be in the wash of the front wheel.</p></li>
 <li><p>Pitot tube must not be so close to the frame and rider, that
@@ -848,59 +847,66 @@ bike.</p></li>
 </ul>
 <h2 id="physical-design-esp32"><strong>Physical Design
 ESP32</strong></h2>
-<p>The sensor connections use I2C, with Grove connectors note M5 allows
-redefinition of GPIOs, so UART is also an option (e.g.: TOF
-sensors):</p>
+<p>Sensor connections use I2C, for wires don't rely on color look at
+position and labels, with Grove connectors:</p>
 <h3
-id="pin-1-scl-yellowserial-clock-line-for-timing-synchronization.">Pin 1
-SCL YellowSerial Clock line for timing synchronization.</h3>
-<h3 id="pin-2-sda-white-serial-data-line-for-sendingreceiving.">Pin 2
-SDA White Serial Data line for sending/receiving.</h3>
+id="pin-1-scl-yellow-or-white-serial-clock-line-for-timing-synchronization.">Pin
+1 SCL Yellow or White Serial Clock line for timing synchronization.</h3>
 <h3
-id="pin-3-vcc-red-power-supply-typically-dual-compatible-with-3.3v-or-5v.">Pin
-3 VCC Red Power supply (typically dual-compatible with 3.3V or 5V).</h3>
+id="pin-2-sda-white-or-yellow-serial-data-line-for-sendingreceiving.">Pin
+2 SDA White or Yellow Serial Data line for sending/receiving.</h3>
+<h3 id="pin-3-vcc-red-power-supply">Pin 3 VCC Red Power supply </h3>
 <h3 id="pin-4-gnd-black-common-ground-reference.">Pin 4 GND Black Common
 ground reference.</h3>
 <p>Pin order matters, as sensors use differing pin standards, (e.g.:
 HY2.0-4P, JST SH /GH), which have different pin orders, plug sizes and
 pitches. Suggest working back from the ESP32 Grove to the sensor
 requirement.</p>
-<p><img src="./media/image7.png"
+<p><img src="./media/image8.png"
 style="width:6.75347in;height:6.28681in" /></p>
 <h2 id="working-prototypes">Working Prototypes</h2>
 <p>Prototypes below:</p>
 <ul>
-<li><p>M5Stamp with Grove breakout, BMP280 and wing edge
+<li><p>M5Stamp S3 with Grove breakout, BMP280 and wing edge MS4524D01
 airspeed</p></li>
-<li><p>M5Stamp direct connection, BMP390, and DS4524D01 with standard
+<li><p>M5Stamp S3 direct connection, BMP390, and MS4524D01 with standard
 Pitot tube</p></li>
-<li><p>M5Stamp Capsule</p></li>
+<li><p>M5Stamp S3 with Capsul, BMP280, wing edge MS4524D01, internal
+accelerometer, and TF card.</p></li>
 </ul>
-<p>Its possible to make more streamlined solutions an M5Stick the Garmin
-headset could be replaced, the downside would be the loss of correlation
-with other cycling metrics.</p>
-<table style="width:97%;">
+<p>The Garmin headset could be replaced by a M5Stick, the downside would
+be the loss of correlation with other cycling metrics.</p>
+<table>
 <colgroup>
 <col style="width: 49%" />
-<col style="width: 47%" />
+<col style="width: 50%" />
 </colgroup>
 <thead>
 <tr>
-<th><p>M5Stamp on Grove breakout using wing Airspeed sensor, BMP280 and
+<th><p>M5Stamp on Grove breakout using wing airspeed sensor, BMP280 and
 Accel; breakout has a built in battery unit.</p>
-<p><img src="./media/image8.png"
-style="width:3.35337in;height:3.80488in" /></p></th>
-<th>M5Stamp using airspeed sensor with external Pitot tube and BMP390,
-needs external battery unit.<img src="./media/image9.jpg"
-style="width:3.06473in;height:3.69178in" /></th>
+<p><img src="./media/image9.png"
+style="width:3.64452in;height:3.81204in" /><img
+src="./media/image10.png"
+style="width:3.42019in;height:2.37742in" /></p></th>
+<th><p>M5Stamp using airspeed sensor with external Pitot tube and
+BMP390, needs external battery unit<img src="./media/image11.jpg"
+style="width:3.56124in;height:3.61807in" /></p>
+<p>Capsule using wing airspeed sensor and BMP280, this is best solution,
+internal battery, internal accelerometer and card for additional
+metrics.</p>
+<p>Battery life is a bit short, however testing is normally only one
+hour durations. Cable are easily tidied into box (and could be
+rationalized - sadly the 2 Grove port extender, doesn't work on Capsule
+when the USB port is plugged in)</p></th>
 </tr>
 </thead>
 <tbody>
 </tbody>
 </table>
 <h1 id="appendices">Appendices</h1>
-<h2 id="appendix-0-accounting-for-rolling-mass">Appendix 0‑ Accounting
-for Rolling Mass</h2>
+<h2 id="appendix-accounting-for-rolling-mass">Appendix ‑ Accounting for
+Rolling Mass</h2>
 <p>To account for wheel inertia, the total kinetic energy should include
 translational and rotational components, as all acceleration consumes
 energy:</p>
@@ -932,7 +938,7 @@ inertia of the wheels.</p></li>
 </ul>
 <h3 id="estimating-i"><em>Estimating "I"</em> </h3>
 <p>The I value changes between a climbing wheel and a disc wheel.</p>
-<table style="width:97%;">
+<table style="width:98%;">
 <colgroup>
 <col style="width: 25%" />
 <col style="width: 21%" />
@@ -959,13 +965,13 @@ m^{2}\]</span></td>
 <td>Deep Section (80mm)</td>
 <td><span class="math display">\[\approx 0.14\ kg\ m^{2}\]</span></td>
 <td>1.2 kg</td>
-<td>approx 2.4 kg per pair)</td>
+<td>approx. 2.4 kg per pair)</td>
 </tr>
 <tr>
 <td>Rear Disc Wheel</td>
 <td><span class="math display">\[\approx 0.18\ kg\ m^{2}\]</span></td>
 <td>1.6 kg</td>
-<td>approx 3.2 kg (rear only)</td>
+<td>approx. 3.2 kg (rear only)</td>
 </tr>
 </tbody>
 </table>
@@ -993,25 +999,23 @@ relevant to development.</p>
 <p>const BLE_DEBUG = true;</p>
 <p>var USING_SENSOR = true;</p>
 <p>const TESTING_WITH_FAN = true;</p>
-<p>DEBUG -- Prints contents if DEBUG print lines</p>
-<p>BLE_DEBUG - Prints contents if DEBUG in BLE connection area</p>
-<p>USING_SENSOR -- When "false" all code connecting to BLE is
+<p>DEBUG: Prints debug lines DEBUG generally.</p>
+<p>BLE_DEBUG: Prints debug lines BLE connection code</p>
+<p>USING_SENSOR: When "false" all code connecting to BLE is
 bypassed.</p>
-<p>TESTING_WITH_FAN -- When "true" assume simulation data generated/ FIT
+<p>TESTING_WITH_FAN: When "true" assume simulation data generated/ FIT
 file is being played, with connected airspeed sensor that's pointed at a
 fan, the value of Air Speed used in the application becomes the ((ground
 speed from FIT file/Sim) + Sensor Input); this gives a more realistic
 simulation, so the ground and airspeed will differ.</p>
 <h3 id="esp32-development-vs-code-platformio">ESP32 development: VS Code
 + PlatformIO</h3>
-<p>The code is all built with PlatformIO for the ESP32 development –
-with something else, then some playing around with the configuration
-file will be required.</p>
+<p>The ESP32 development uses PlatformIO – with something else, then
+some playing around with the configuration file will be required.</p>
 <h2 id="appendix-03-sensor-details">Appendix 0‑3 Sensor Details</h2>
-<p>All sensors used, follow Inter-Integrated Circuit,
-<strong>I</strong>2C, standard, <em>I-squared-C</em>, a synchronous,
-multi-device communication protocol used to connect peripherals to
-microcontrollers. It uses:</p>
+<p>All sensors used, follow Inter-Integrated Circuit, I2C, standard,
+<em>I-squared-C</em>, asynchronous, multi-device communication
+protocol:</p>
 <ul>
 <li><p><em>SDA (Serial Data):</em> send and receive data bits.</p></li>
 <li><p><em>SCL (Serial Clock):</em> clock signal generated by the master
@@ -1058,9 +1062,9 @@ factors below:</p>
 </colgroup>
 <thead>
 <tr>
-<th style="text-align: left;"><img src="./media/image10.png"
+<th style="text-align: left;"><img src="./media/image12.png"
 style="width:3.23705in;height:2.70208in" /></th>
-<th style="text-align: left;"><img src="./media/image11.png"
+<th style="text-align: left;"><img src="./media/image13.png"
 style="width:3.52268in;height:2.60347in" /></th>
 </tr>
 </thead>
@@ -1084,9 +1088,9 @@ class="math inline">\(\text{±1C}\)</span></p>
 </colgroup>
 <thead>
 <tr>
-<th style="text-align: left;"><img src="./media/image12.png"
+<th style="text-align: left;"><img src="./media/image14.png"
 style="width:2.53465in;height:2.56447in" /></th>
-<th style="text-align: left;"><img src="./media/image13.png"
+<th style="text-align: left;"><img src="./media/image15.png"
 style="width:2.24227in;height:2.24724in" /></th>
 </tr>
 </thead>
@@ -1104,7 +1108,7 @@ BMP280:</p>
 addresses.</p></li>
 </ul>
 <blockquote>
-<p><img src="./media/image14.png"
+<p><img src="./media/image16.png"
 style="width:3in;height:2.02778in" /></p>
 </blockquote>
 <p>BMP390 measures temperature for internal compensation, this
@@ -1113,8 +1117,8 @@ class="math inline">\(\pm 0.5C\)</span> and 0.005 resolution, so <span
 class="math inline">\(\pm 0.2C\)</span> less accurate than the
 AHT20.</p>
 <h3
-id="accelerometer-gyroscope-not-in-this-git--in-test-only">Accelerometer
-+ Gyroscope (Not in this Git- in test only)</h3>
+id="accelerometer-gyroscope-in-git-for-capsule-only---calculated-in-log">Accelerometer
++ Gyroscope (In Git for Capsule only - calculated in log)</h3>
 <p>ACCEL is a motion sensor. With ADXL 345 and ACC, 3-axis speed can be
 derived.</p>
 <ul>
@@ -1128,45 +1132,41 @@ can detect tilt changes of less than 1.0°.</p></li>
 detecting tap/double-tap events, general activity, and
 inactivity</p></li>
 </ul>
-<p><img src="./media/image15.png"
+<p><img src="./media/image17.png"
 style="width:2.47619in;height:2.89764in" /></p>
-<p>I've tested 1 US accelerometer product; the results are compatible
-with checking the delta velocities.</p>
-<p>The M5Stack Capsule (ESP32) has BMI270 is a 6-axis Inertial
-Measurement Unit (IMU), It combines a 3-axis Accelerometer and a 3-axis
-Gyroscope</p>
+<p>I've tested 1 US accelerometer product; the results are similar to
+checking the delta velocities. Though not in the git.</p>
+<p>The M5Stack Capsule has BMI270 is a 6-axis Inertial Measurement Unit
+(IMU), It combines a 3-axis Accelerometer and a 3-axis Gyroscope. This
+is a better solution.</p>
 <h4 id="section-1"></h4>
 <h4 id="estimating-the-a-in-cda---lidar-tof-or-ai-camera">Estimating the
-A in CdA - Lidar, ToF or AI camera</h4>
+"A" in CdA - Lidar, ToF or AI camera</h4>
 <p>This section discusses future sensor usage and small ESP32 edge
 models. The main use-case is probably in-door smart trainer usage, where
-additional information is easily absorbed and relieves boredom or static
+additional information is easily absorbed and relieves boredom of static
 training. This will be the subject of a separate paper.</p>
 <p>Integrating a rear-facing, handlebar-mounted micro-LiDAR /TOF could
 create an automated Aerodynamic Position Classifier/ Area Estimated. The
 sensors combined with machine learning models could match distinct
 geometric postures directly to their corresponding real-time drag
 values.</p>
+<p><img src="./media/image18.png"
+style="width:4.48264in;height:1.78231in" /></p>
 <p>Collected data could train a model, which is then used as classifier
 for good positions, an AI camera with depth perception is also an
 option. Logging on SD is mandatory with these approaches. Hypothetical
 diagram:</p>
-<p><img src="./media/image16.png"
-style="width:6.75347in;height:4.50556in" /></p>
 <p><strong><u>ToF Sensor</u></strong></p>
 <p>The VL53L5CX is a time-of-flight (ToF) multi-area sensor, and can
-measure distances regardless of target color and reflectivity. Accurate
-range of up to 400 cm and operates upto 60 Hz. It can capture a cell
-count ​​up to 8x8 with a 63° field of view, these can be reduced in
-software.</p>
-<p>The VL53L5CX is based on SPAD technology: Single-Photon Avalanche
-Diode:</p>
+measure distances range of up to 400 cm at 60 Hz. It can capture a cell
+count ​​up to 8x8 with a 63° field of view. Its based on Single-Photon
+Avalanche Diodes, SPAD:</p>
 <ul>
 <li><p>Solid-state photodetector. detects and counts individual light
-particles (photons).</p></li>
-<li><p>kcps/spads stands for kilo counts per second per SPAD, which is a
-unit of measurement used to quantify light signal strength in advanced
-photon-detecting and ranging sensors.</p></li>
+particles</p></li>
+<li><p>kcps/spads stands for kilo counts per second per SPAD, quantifies
+light signal strength in photon-detecting and ranging sensors.</p></li>
 </ul>
 <table>
 <colgroup>
@@ -1175,9 +1175,9 @@ photon-detecting and ranging sensors.</p></li>
 </colgroup>
 <thead>
 <tr>
-<th><img src="./media/image17.png"
+<th><img src="./media/image19.png"
 style="width:2.76191in;height:1.74962in" /></th>
-<th><p><img src="./media/image18.png"
+<th><p><img src="./media/image20.png"
 style="width:3.75535in;height:2.55597in" /></p>
 <ul>
 <li><p>Line 1. distance in mm</p></li>
@@ -1192,10 +1192,10 @@ reflectance in % "," Target status (5,9 is ok).</p></li>
 </tbody>
 </table>
 <p><strong><u>TOF Camera</u></strong></p>
-<p>The Sipeed A010 TOF camera has also be tested, this has a 100X100
-output and costs around 40US. It doesn't use SPAD but an interference
-mechanism and valid to 2.5 metres, this is probably the best sensor
-solution for body position monitoring:</p>
+<p>The Sipeed A010 TOF camera has been tested, this has a 100X100 output
+and costs around 40US. It doesn't use SPAD but an interference mechanism
+and valid to 2.5 metres, this is probably the best sensor solution for
+body position monitoring:</p>
 <table>
 <colgroup>
 <col style="width: 50%" />
@@ -1203,16 +1203,18 @@ solution for body position monitoring:</p>
 </colgroup>
 <thead>
 <tr>
-<th><img src="./media/image19.png"
-style="width:3.28542in;height:3.58503in" /></th>
-<th><img src="./media/image20.png"
-style="width:3.37546in;height:3.63293in" /></th>
+<th><img src="./media/image21.png"
+style="width:3.28513in;height:2.7483in" /></th>
+<th><img src="./media/image22.png"
+style="width:3.40266in;height:2.80737in" /></th>
 </tr>
 </thead>
 <tbody>
 </tbody>
 </table>
-<h2 id="section-2"></h2>
+<p>In 3-model</p>
+<h2 id="section-2"><img src="./media/image23.png"
+style="width:5.00778in;height:3.42177in" /></h2>
 <h2 id="section-3"></h2>
 <h2 id="appendix-04-esp32-logging-and-persistence-workflow">Appendix 0‑4
 ESP32 Logging and Persistence Workflow</h2>
@@ -1290,7 +1292,7 @@ executes compute(info) function.</p></li>
 <p>Because these cycles are decoupled, the 4 Hz packets will land at
 varying times within that 1-second Garmin window. In a perfect
 "unlikely" world the situation would be:</p>
-<p><img src="./media/image21.png"
+<p><img src="./media/image24.png"
 style="width:6.75347in;height:1.50139in" /></p>
 <p>In all cases, 4 Hz packets will be "out of phase" with Garmin's 1 HZ
 sensor data, note the Garmin works a 1HZ, sensors could operate at much
@@ -1320,13 +1322,13 @@ Controller Hardware</h2>
 are dual core processors, (Cs are single core, which the code supports).
 One core handles sensor, the other manages BLE communications.
 M5Stamp-S3A costs around 10 USD.</p>
-<p><img src="./media/image22.png"
+<p><img src="./media/image25.png"
 style="width:3.05903in;height:2.60396in" /></p>
 <h3 id="section-4"></h3>
 <h3 id="m5stamp-grove-breakout-board">M5Stamp Grove Breakout Board</h3>
 <p>The expansion board adds a battery holder, and simplifies the
 connection of I2C sensors with Grove ports. Around 6 USD.</p>
-<p><img src="./media/image23.png"
+<p><img src="./media/image26.png"
 style="width:4.0495in;height:3.86636in" /></p>
 <p>(Only the 16340 fits)</p>
 <h3 id="m5stack-capsules">M5Stack Capsules</h3>
@@ -1334,20 +1336,168 @@ style="width:4.0495in;height:3.86636in" /></p>
 built around the <strong>M5StampS3</strong>. It’s the most suitable for
 building the home solution, it would need a 2 I2C adapter, and will
 minimize all wiring and control. (Not shown, as mine hasn't arrived</p>
-<p><img src="./media/image24.png"
+<p><img src="./media/image27.png"
 style="width:3.57426in;height:3.52808in" /></p>
 <p>Useful for Project Features:</p>
-<p><strong>Enclosure:</strong> durable for outdoor environments.</p>
-<p><strong>Battery &amp; Power:</strong> internal 250mAh lithium battery
-and built-in charging circuit.</p>
-<p><strong>Grove Port:</strong> HY2.0-4P connector to external I2C
-units, such as I2C breakout adapter.</p>
-<p><strong>Buttons:</strong> Includes a multi-function button for input
-and a reset button accessed through the shell – this saves command
-programing in Garmin, e.g.: start/stop logs.</p>
-<p><strong>BMI270:</strong> built in acceleration sensor.</p>
-<p><strong>Timing:</strong> module has a clock, so debugging/detailed
-log output can have actual time stamps, without a specialized sensor,
-other solutions time stamp, is the duration since logging started.</p>
+<ul>
+<li><p><strong>Enclosure:</strong> durable for outdoor
+environments.</p></li>
+<li><p><strong>Battery &amp; Power:</strong> internal 250mAh lithium
+battery and built-in charging circuit.</p></li>
+<li><p><strong>Grove Port:</strong> HY2.0-4P connector to external I2C
+units, such as I2C breakout adapter.</p></li>
+<li><p><strong>Buttons:</strong> Includes a multi-function button for
+input and a reset button accessed through the shell – this saves command
+programing in Garmin, e.g.: start/stop logs.</p></li>
+<li><p><strong>BMI270:</strong> built in acceleration sensor.</p></li>
+<li><p><strong>Timing:</strong> module has a clock, so
+debugging/detailed log output can have actual time stamps, without a
+specialized sensor, other solutions time stamp, is the duration since
+logging started.</p></li>
+</ul>
+<h2
+id="appendix-07-accelerometer-for-altitude-and-velocity-change">Appendix
+0‑7 Accelerometer for altitude and velocity change</h2>
+<p>These are calculated and logged in the Capsule implementation, but
+not used in the Garmin calculation. This section is for
+reference/notes:</p>
+<h3 id="climbrate">ClimbRate</h3>
+<p>ClimbRate_mps estimates vertical velocity in metres per second by
+combining the BMI270 accelerometer with BMP-derived altitude.</p>
+<p>How it works:</p>
+<ol type="1">
+<li><p>The filtered acceleration magnitude is calculated: sqrt(x² + y² +
+z²)</p></li>
+</ol>
+<ol start="2" type="1">
+<li><p>Gravity (1 g) is removed and the result converted to m/s²:
+verticalAcceleration = (accelerationMagnitudeG - 1.0f) *
+9.80665f;</p></li>
+</ol>
+<ol start="3" type="1">
+<li><p>That acceleration is integrated over time: climbRate +=
+verticalAcceleration * dt;</p></li>
+</ol>
+<ol start="4" type="1">
+<li><p>Altitude changes from either the BMP390 or BMP280 produce a
+barometric climb rate.</p></li>
+<li><p>The barometric rate is low-pass filtered and gradually corrects
+accelerometer integration drift.</p></li>
+<li><p>The resulting ClimbRate_mps is averaged into the telemetry
+stream.</p></li>
+</ol>
+<p>Positive values indicate climbing; negative values indicate
+descending:</p>
+<ul>
+<li><p>ClimbRate_mps = 1.25 → climbing at 1.25 m/s</p></li>
+<li><p>ClimbRate_mps = -0.60 → descending at 0.60 m/s</p></li>
+<li><p>ClimbRate_mps = 0.00 → approximately level</p></li>
+</ul>
+<p>Limitations:</p>
+<ul>
+<li><p>Acceleration magnitude is not a true earth-frame vertical
+acceleration. Horizontal acceleration, braking, cornering, bumps, and
+vibration can be mistaken for vertical motion.</p></li>
+<li><p>The USB-facing −Y direction is not currently used in this
+calculation. Using vector magnitude makes it insensitive to mounting
+orientation, but loses directional information.</p></li>
+<li><p>Accelerometer-only operation drifts. Without a BMP390 or BMP280,
+the rate will gradually become inaccurate.</p></li>
+<li><p>Barometric altitude responds slowly and is affected by weather,
+airflow around the enclosure, pressure turbulence, and enclosure
+venting.</p></li>
+<li><p>At a constant climb speed, vertical acceleration is approximately
+zero. In that situation, the BMP—not the accelerometer—provides the
+continuing climb-rate indication.</p></li>
+<li><p>The 0.05 m/s² dead zone rejects small noise but can hide very
+gentle acceleration.</p></li>
+<li><p>Barometric rates above 20 m/s are rejected as pressure spikes, so
+extreme climbs would be clipped.</p></li>
+<li><p>The function rejects timing gaps longer than 250 ms.</p></li>
+<li><p>It does not use the BMI270 gyroscope or orientation filter. A
+gyro/accelerometer attitude solution would provide a better earth-frame
+vertical acceleration.</p></li>
+<li><p>Road gradient alone does not produce climb rate. The bike must be
+moving, and either altitude change or travel speed combined with pitch
+is required.</p></li>
+</ul>
+<h3 id="forward-acceleration">Forward Acceleration</h3>
+<p>ForwardAccel_mps2 estimates linear acceleration along the direction
+the USB port points. You need to chose a direction. It is intended for
+kinetic-energy and power calculations.</p>
+<p>How it works:</p>
+<ol type="1">
+<li><p>The Capsule’s USB-facing direction is mapped to IMU −Y:
+forwardSpecificForceG = -accelY;</p></li>
+</ol>
+<ol start="2" type="1">
+<li><p>Pitch is estimated from gravity: accelPitch = atan2(-accelY,
+accelZ);</p></li>
+</ol>
+<ol start="3" type="1">
+<li><p>Gyroscope X is integrated and combined with accelerometer pitch
+using a complementary filter: pitch = 0.98 * (previousPitch - gyroX *
+dt) + 0.02 * accelPitch;</p></li>
+</ol>
+<p>The gyro provides fast response, while the accelerometer gradually
+corrects gyro drift.</p>
+<ol start="4" type="1">
+<li><p>Gravity along the forward direction is calculated from pitch:
+forwardGravityG = sin(pitch);</p></li>
+</ol>
+<ol start="5" type="1">
+<li><p>Gravity is removed and the result converted to m/s²:
+ForwardAccel_mps2 =</p></li>
+</ol>
+<p>(forwardSpecificForceG - forwardGravityG) * 9.80665;</p>
+<p>Interpretation:</p>
+<ul>
+<li><p>0.00 m/s² constant speed or stationary</p></li>
+<li><p>0.50 m/s² accelerating toward the USB port</p></li>
+<li><p>-0.50 m/s² braking or accelerating away from the USB
+port</p></li>
+</ul>
+<p>Limitations:</p>
+<ul>
+<li><p>The device must be rigidly mounted with the USB port pointing in
+the direction of travel.</p></li>
+<li><p>A mounting-angle error directly contaminates the result with
+gravity. A one-degree error can introduce about 0.17 m/s².</p></li>
+<li><p>The assumed gyro-X sign must be confirmed by tilting the USB end
+upward and checking that stationary forward acceleration remains near
+zero.</p></li>
+<li><p>Sustained vehicle acceleration also influences
+accelerometer-derived pitch. The complementary filter will eventually
+interpret part of prolonged acceleration as tilt and under-report
+it.</p></li>
+<li><p>Braking has the same problem in the opposite direction.</p></li>
+<li><p>Road vibration and impacts can create large short acceleration
+spikes.</p></li>
+<li><p>Banking, cornering, and sideways movement are not fully
+compensated because this is a pitch estimator, not a complete quaternion
+orientation solution.</p></li>
+<li><p>Gyroscope bias causes short-term pitch drift; accelerometer
+correction reduces but does not eliminate it.</p></li>
+<li><p>The individual IMU axes are Kalman-filtered, introducing some
+delay and reducing sharp acceleration peaks.</p></li>
+<li><p>Telemetry averaging introduces further delay. The logged value is
+not the instantaneous 50 Hz reading.</p></li>
+<li><p>Wheel-derived ground speed and IMU acceleration may not be
+perfectly time-aligned.</p></li>
+<li><p>Kinetic calculations require total moving mass: rider, bicycle,
+device, luggage, and other carried equipment.</p></li>
+<li><p>mass × speed × acceleration only represents the rate of change of
+kinetic energy. It excludes climbing power, aerodynamic drag, rolling
+resistance, drivetrain loss, and braking heat.</p></li>
+<li><p>During wheel slip or while airborne, wheel speed may not
+represent actual vehicle speed.</p></li>
+</ul>
+<p>For higher accuracy, the next improvement would be full
+gyroscope/accelerometer quaternion orientation, careful stationary bias
+calibration, and synchronized speed and acceleration samples.only calc
+acceleration -- the esp doesn't know mass</p>
+<p>The Garmin application can later calculate kinetic power using its
+known mass:</p>
+<p>Power = mass × speed × ForwardAccel_mps2</p>
 </body>
 </html>
