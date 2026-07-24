@@ -52,12 +52,7 @@ class CdA_CalculatorBleDelegate extends BluetoothLowEnergy.BleDelegate {
             :uuid => _service,
             :characteristics => [ { :uuid => _char, :descriptors => [ BluetoothLowEnergy.cccdUuid() ] } ]
         });
-        BluetoothLowEnergy.setScanState(BluetoothLowEnergy.SCAN_STATE_SCANNING);
-        _connectionStatus = "SCANNING";
-
-        if (_bleDebug) {
-            System.println("BLE Simple: Scanning for UUID " + _service.toString());
-        }
+        _connectionStatus = "OFF";
         _rollingData = new [ROLLING_WINDOW_BLE];
     }
 
@@ -68,6 +63,9 @@ class CdA_CalculatorBleDelegate extends BluetoothLowEnergy.BleDelegate {
     public function startScanning() as Void {
         BluetoothLowEnergy.setScanState(BluetoothLowEnergy.SCAN_STATE_SCANNING);
         _connectionStatus = "SCANNING";
+        if (_bleDebug) {
+            System.println("BLE Simple: Scanning for UUID " + _service.toString());
+        }
     }
 
     public function stopScanning() as Void {

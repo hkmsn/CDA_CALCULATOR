@@ -89,10 +89,6 @@ class CdA_CalculatorView extends WatchUi.DataField {
 	var	sumOfSpeedMSec      as Float = 0.0f;
 	var sumOfSpeedSqDiff    as Float = 0.0f;
 
-    // Debug Snapshot variables
-    private var _debugGarmin as Array<Float?> = new [Utilities.EXPECTED_SENSOR_PARAMS] as Array<Float?>;
-    private var _debugFused  as Array<Float?> = new [Utilities.EXPECTED_SENSOR_PARAMS] as Array<Float?>;
-
     var sumOfSpeedAirSensorMSec as Float = 0.0f;
 	var	sumOfPower              as Float = 0.0f;
 	var sumOfDragPowerFactor    as Float = 0.0f;
@@ -134,7 +130,7 @@ class CdA_CalculatorView extends WatchUi.DataField {
     //! The given info object contains all the current workout
     //! information. Calculate a value and return it in this method.
 
-    function compute(info as Activity.Info) as Numeric? {    
+    function compute(info as Activity.Info) as Numeric? {
     // 1. Local data capture and basic validation
         var sParams      = sensorParams;
         var curSpeed     = info.currentSpeed;
@@ -189,13 +185,6 @@ class CdA_CalculatorView extends WatchUi.DataField {
             _bleRetryTick = 0;
         }
 
-        // Debug update must occur before the guard to capture 0.00 stationary speed
-        if (Utilities.DEBUG) {
-            Utilities.updateDebugGarmin(_debugGarmin, rawSpeed, rawAlt, tempC, pressurePa);
-            // Garmin head units do not natively provide Air Speed; N/A ensures no confusion with GSpd
-            _debugGarmin[Utilities.AIR_SPEED_INX] = null;
-        }
-
         // Determine Air Density: Priority BLE Sensor -> Fallback Garmin Internal
         var sRho = (sParams != null && sParams.size() > Utilities.RHO_INX) ? sParams[Utilities.RHO_INX] : null;
         if (sRho != null && sRho > 0.1f) {
@@ -223,15 +212,9 @@ class CdA_CalculatorView extends WatchUi.DataField {
             speedAirSensorMSec = rawSpeed; // Default to Ground Speed
         }
 
-        if (Utilities.DEBUG) {
-            // ASpd Fused value matches Sensor ASpd (if available) to verify connection integrity
-            _debugFused[Utilities.AIR_SPEED_INX] = speedAirSensorMSec;
-            _debugFused[Utilities.RHO_INX]       = airDensity;
-        }
-
         // Guard: Only exit if not fan testing AND speed is low (NaN safe check)
         if (!Utilities.TESTING_WITH_FAN && (rawSpeed == null || rawSpeed < 0.5f)) { 
-            if (Utilities.DEBUG) { printDebugTable(); }
+            if (Utilities.DEBUG) { printDebugTable(rawAlt); }
             return (CdAValue > 0) ? CdAValue : 0.0f; 
         }
 
@@ -324,11 +307,6 @@ class CdA_CalculatorView extends WatchUi.DataField {
             var fusedDelta = (fusedDeltaRaw != null && fusedDeltaRaw == fusedDeltaRaw) ? fusedDeltaRaw : 0.0f;
             altitudePrevious = altResult[1];
 
-            if (Utilities.DEBUG) {
-                // Capture the raw Garmin altitude change for the debug table
-                _debugGarmin[Utilities.ALT_DIFF_INX] = garminAltDelta;
-            }
-
             hGAltDiff[durationIdxNext] = fusedDelta;
             
             sumOfPower              += power;
@@ -353,11 +331,7 @@ class CdA_CalculatorView extends WatchUi.DataField {
         avgDragFactor           = sumOfDragPowerFactor / divisor;
         avgVerticalSpeedMS      = sumOfFusedAltitudeDifferences / divisor; // Average vertical rate (m/s) over the duration
 
-        if (Utilities.DEBUG) {
-            // Capture the rolling average state for the calculation columns
-            _debugFused[Utilities.ALT_INX]       = altitude;
-            _debugFused[Utilities.ALT_DIFF_INX]  = avgVerticalSpeedMS;
-        }
+        if (Utilities.DEBUG) { printDebugTable(rawAlt); }
 
         // Apply physics with correct weight types: static mass for gravity/rolling, effective mass for inertia
         var rawClimb = (speedAvgMSec > 0.5f) ? (staticWeight * Utilities.ACCELERATION_GRAVITY * avgVerticalSpeedMS) : 0.0f;
@@ -443,10 +417,6 @@ class CdA_CalculatorView extends WatchUi.DataField {
         speedMSecPrevious = speedMSec;
         _garminAltPrevious = altitude;
 
-        if (Utilities.DEBUG) {
-            printDebugTable();
-        }
-
         return (CdAValue > 0) ? CdAValue : 0.0f;
     }
 
@@ -524,6 +494,14 @@ class CdA_CalculatorView extends WatchUi.DataField {
     }
 
     function onUpdate(dc as Graphics.Dc) as Void {
+        // Garmin may suspend the normal DataField.compute() callback while the
+        // activity timer is stopped. Keep the live calculation and display
+        // updating, but leave FIT writes gated by timerState inside compute().
+        var liveInfo = Activity.getActivityInfo();
+        if (liveInfo.timerState == null || liveInfo.timerState != Activity.TIMER_STATE_ON) {
+            compute(liveInfo);
+        }
+
         var bgColor = getBackgroundColor();
         var FontDisplayColor = (bgColor == Graphics.COLOR_BLACK) ? Graphics.COLOR_WHITE : Graphics.COLOR_BLACK;
         
@@ -634,48 +612,17 @@ class CdA_CalculatorView extends WatchUi.DataField {
         } 
     }
 
-    private function printDebugTable() as Void {
-        var rowOrder = [
-            Utilities.AIR_SPEED_INX, 
-            Utilities.RHO_INX, 
-            Utilities.ALT_INX, 
-            Utilities.ALT_DIFF_INX
-        ];
-        var labels   = ["ASpd", "Rho", "Alt", "dAlt"];
+    private function printDebugTable(garminAltitude as Float) as Void {
         var sParams = sensorParams;
-        if (Utilities.DEBUG ) {
-        System.println("-----------------------------------------------------------");
-        System.println("CdA Debug Table (Cycle: " + samplesCollected + ")");
-        System.println("Param  | Garmin       | Sensor       | Fused");
-        System.println("-----------------------------------------------------------");
-        System.println("Weight | " + staticWeight.format("%12.1f") + " |         N/A  | " + staticWeight.format("%12.1f"));
-        System.println("Mass_e | " + effectiveMass.format("%12.1f") + " |         N/A  | " + effectiveMass.format("%12.1f"));
-        System.println("-----------------------------------------------------------");
-        
-        for (var i = 0; i < rowOrder.size(); i++) {
-            var idx = rowOrder[i];
-            var label = labels[i];
-            while (label.length() < 6) { label += " "; }
+        var sensorAlt = (sParams != null && Utilities.ALT_INX < sParams.size()) ? sParams[Utilities.ALT_INX] : null;
+        var sensorDelta = (sParams != null && Utilities.ALT_DIFF_INX < sParams.size()) ? sParams[Utilities.ALT_DIFF_INX] : null;
 
-            // Column 1: Garmin
-            var gVal = _debugGarmin[idx];
-            var gStr = (gVal != null) ? gVal.format("%12.2f") : "         N/A";
-
-            // Column 2: Sensor
-            var sVal = null;
-            if (sParams != null && idx < sParams.size()) {
-                sVal = sParams[idx];
-            }
-            // Critical Fix: Only call .format() if sVal is actually a Number. 
-            // If the BLE delegate passed the string "NA", this would crash without the instanceof check.
-            var sStr = (sVal != null && (sVal instanceof Lang.Number || sVal instanceof Lang.Float)) ? sVal.format("%12.2f") : "         N/A";
-
-            // Column 3: Fused
-            var fVal = _debugFused[idx];
-            var fStr = (fVal != null && (fVal instanceof Lang.Number || fVal instanceof Lang.Float)) ? fVal.format("%12.2f") : "         N/A";
-
-            System.println(label + " |" + gStr + " |" + sStr + " |" + fStr);
-        }
+        var gAltText = garminAltitude.toString();
+        var sAltText = (sensorAlt != null) ? sensorAlt.toString() : "N/A";
+        var fAltText = altitude.toString();
+        var gDeltaText = garminAltDelta.toString();
+        var sDeltaText = (sensorDelta != null) ? sensorDelta.toString() : "N/A";
+        var fDeltaText = avgVerticalSpeedMS.toString();
 
         // Report the delegate's real state rather than inferring connection
         // from sensor data, which cannot distinguish pairing from streaming.
@@ -683,12 +630,9 @@ class CdA_CalculatorView extends WatchUi.DataField {
         if (_bleDelegate != null && _bleDelegate has :getConnectionStatus) {
             bleStatus = _bleDelegate.getConnectionStatus();
         }
-        System.println("BLE    | " + bleStatus);
-
-        System.println("-----------------------------------------------------------");
-        System.println("AeroPower: " + aeroPower.format("%.1f") + "W | CdA: " + CdAValue.format("%.4f"));
-        System.println("-----------------------------------------------------------\n");
-    }
+        System.println("Alt G=" + gAltText + " S=" + sAltText + " F=" + fAltText
+            + " | dAlt G=" + gDeltaText + " S=" + sDeltaText + " F=" + fDeltaText
+            + " | BLE=" + bleStatus);
     }
 
 	function textJ(dc as Graphics.Dc, x as Numeric, y as Numeric, font as Graphics.FontDefinition, color as Graphics.ColorValue, justify as Graphics.TextJustification, s as String?) as Void

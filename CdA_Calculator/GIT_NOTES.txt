@@ -1,123 +1,85 @@
- how to synch grouping directories
+# Publish CdA Calculator suite
 
-cd ~/Documents
+The combined GitHub repository is:
 
+- Repository: https://github.com/hkmsn/CDA_CALCULATOR
+- Site: https://hkmsn.github.io/CDA_CALCULATOR/
+- Local checkout: `/Users/marknelson/Documents/CDA_CALCULATOR`
+
+Source projects:
+
+- Monkey C: `/Users/marknelson/Documents/dev/MONKEY_C/CdA_Calculator`
+- ESP32: `/Users/marknelson/Documents/dev/ESP32/PlatformIO/Projects/ESP32_AERO`
+
+## Initial setup
+
+Run once, only if the combined checkout does not already exist:
+
+```bash
+cd /Users/marknelson/Documents
 git clone https://github.com/hkmsn/CDA_CALCULATOR.git
+```
 
-cd CDA_CALCULATOR
+## Update the combined repository
 
-rsync -av --delete "/Users/marknelson/Documents/dev/MONKEY_C/CdA_Calculator/" "./CdA_Calculator/"
+Start from a clean combined checkout and update it without rewriting history:
 
-rsync -av --delete "/Users/marknelson/Documents/dev/ESP32/PlatformIO/Projects/ESP32_AERO/" "./ESP32_AERO/"
+```bash
+cd /Users/marknelson/Documents/CDA_CALCULATOR
+git pull --ff-only
+```
 
+Preview both synchronizations before applying them:
 
-
-
-# 1. Stage all your current changes
-git add .
-
-# 2. Create a final commit with a descriptive message
-git commit -m "create doc folder"
-
-# 3. Increase the Git buffer size to handle larger FIT file transfers
-git config http.postBuffer 52428800
-
-# 4. Overwrite the remote with your local master branch
-git push origin main --force
-
-# --- Monorepo / Multi-Project Management ---
-# 1. Add a new project as a submodule:
-# git submodule add https://github.com/username/other-project.git ./other-project
-
-# 2. When cloning this repo for the first time, include submodules:
-# git clone --recursive <this_repo_url>
-
-# 3. If already cloned, initialize submodules:
-# git submodule update --init --recursive
-
-# 4. Pull latest changes for all submodules from their remotes:
-# git submodule update --remote --merge
-
-# --- CdA Calculator Organization ---
-# Initialize at the TOP LEVEL of the project suite:
-# cd /Users/marknelson/Documents/dev/
-# mkdir CdA_calculator && cd CdA_calculator
-# git init
-
-# Create sub-folders:
-# mkdir docs
-# mkdir monkeyc_project
-# mkdir platformio_project
-
-# Note: Ensure .gitignore is updated if PlatformIO creates large build folders (.pio)
-
-Pro-Tip for VS Code
-Since you are mixing Monkey C and PlatformIO (C++/C), VS Code might get confused with extensions.
-I recommend using Multi-Root Workspaces. 
-You can go to File > Add Folder to Workspace... 
-and add the monkeyc_project and platformio_project folders individually. 
-This allows the Monkey C extension and the PlatformIO extension
- ito run only in their respective directories, preventing build tool conflicts.
-
-Pandoc commands
- pandoc AeroDoc.docx -o output_file.mkd
-
-
- cd ~/Documents
-git clone https://github.com/hkmsn/CDA_CALCULATOR.git
-cd CDA_CALCULATOR
-
-rsync -av --delete \
+```bash
+rsync -avni --delete \
   --exclude='.git/' \
   --exclude='.DS_Store' \
   --exclude='developer_key' \
-  "/Users/marknelson/Documents/dev/MONKEY_C/CdA_Calculator/" \
-  "./CdA_Calculator/"
+  --exclude='bin/' \
+  --exclude='~$*' \
+  --exclude='__pycache__/' \
+  --exclude='*.pyc' \
+  /Users/marknelson/Documents/dev/MONKEY_C/CdA_Calculator/ \
+  /Users/marknelson/Documents/CDA_CALCULATOR/CdA_Calculator/
 
-rsync -av --delete \
+rsync -avni --delete \
   --exclude='.git/' \
   --exclude='.pio/' \
+  --exclude='venv/' \
   --exclude='.DS_Store' \
-  "/Users/marknelson/Documents/dev/ESP32/PlatformIO/Projects/ESP32_AERO/" \
-  "./ESP32_AERO/"
+  --exclude='__pycache__/' \
+  --exclude='*.pyc' \
+  --exclude='compile_commands.json' \
+  /Users/marknelson/Documents/dev/ESP32/PlatformIO/Projects/ESP32_AERO/ \
+  /Users/marknelson/Documents/CDA_CALCULATOR/ESP32_AERO/
+```
 
-cp "/Users/marknelson/Documents/dev/MONKEY_C/CdA_Calculator/AeroDoc.html" \
-   "./AeroDoc.html"
+After reviewing the dry-run output, apply the updates by removing `n` from
+`-avni` in both commands. Then update the top-level documentation:
 
-git status
+```bash
+cp /Users/marknelson/Documents/dev/MONKEY_C/CdA_Calculator/AeroDoc.html \
+  /Users/marknelson/Documents/CDA_CALCULATOR/AeroDoc.html
+```
 
+Review and publish only the intended targets:
 
-
+```bash
+cd /Users/marknelson/Documents/CDA_CALCULATOR
+git status --short
+git diff --stat
 git add AeroDoc.html CdA_Calculator ESP32_AERO
-git commit -m "Update CdA calculator, ESP32 firmware, and documentation"
+git diff --cached --stat
+git commit -m "Update calculator, firmware, and documentation"
 git push
+```
 
-cd ~/Documents
-git clone https://github.com/hkmsn/CDA_CALCULATOR.git
-cd CDA_CALCULATOR
+Do not use `git push --force` for routine updates. Do not use `git add .` when
+the checkout contains unrelated changes.
 
-rsync -av --delete \
-  --exclude='.git/' \
-  --exclude='.DS_Store' \
-  --exclude='developer_key' \
-  "/Users/marknelson/Documents/dev/MONKEY_C/CdA_Calculator/" \
-  "./CdA_Calculator/"
+## Generate Markdown from the source document
 
-rsync -av --delete \
-  --exclude='.git/' \
-  --exclude='.pio/' \
-  --exclude='.DS_Store' \
-  "/Users/marknelson/Documents/dev/ESP32/PlatformIO/Projects/ESP32_AERO/" \
-  "./ESP32_AERO/"
-
-cp "/Users/marknelson/Documents/dev/MONKEY_C/CdA_Calculator/AeroDoc.html" \
-   "./AeroDoc.html"
-
-git status
-
-git add AeroDoc.html CdA_Calculator ESP32_AERO
-git commit -m "Update CdA calculator, ESP32 firmware, and documentation"
-git push
-
-https://hkmsn.github.io/CDA_CALCULATOR/
-https://github.com/hkmsn/CDA_CALCULATOR.git
+```bash
+pandoc doc/AeroDoc.docx -o output_file.md
+```

@@ -8,7 +8,7 @@ static const char* TAG = "BLEManager";
 
 // Global variables (declared extern in BLEManager.h)
 std::atomic<float> g_ble_ground_speed{NAN};
-unsigned long g_lastWheelUpdateMillis = 0;
+std::atomic<unsigned long> g_lastWheelUpdateMillis{0};
 
 // --- BLE Callbacks Implementations ---
 
@@ -26,11 +26,11 @@ public:
     MyClientCallback(BLEManager* bm) : _bleManager(bm) {}
     void onConnect(BLEClient* pclient) override { _bleManager->sensorClientConnected = true; }
     void onDisconnect(BLEClient* pclient) override {
-        _bleManager->sensorClientConnected = false;
+        _bleManager->sensorClientConnected.store(false);
         g_ble_ground_speed.store(NAN);
         _bleManager->firstWheelData = true;
         ESP_LOGI(TAG, "CSC Sensor disconnected. Restarting scan.");
-        BLEDevice::getScan()->start(5, false); // Restart scan on disconnect
+        _bleManager->scanRequested.store(true);
     }
     void* getCustomData() { return _bleManager; } // Allow notifyCallback to get BLEManager instance
 };
@@ -47,17 +47,13 @@ public:
         if (len > 0) {
             char cmd = (char)pData[0];
             if (cmd == 's' || cmd == 'S') {
-                _config->loggingEnabled = !_config->loggingEnabled;
-                ESP_LOGI(TAG, "BLE COMMAND: LOGGING %s", _config->loggingEnabled ? "ENABLED" : "DISABLED");
+                extern BLEManager bleManager;
+                bleManager.loggingToggleRequested.store(true);
             } else if (cmd == 'c' || cmd == 'C') {
                 // NOTE: Calling deleteLogFile() here performs SD I/O inside a BLE callback.
                 // This can block the stack and cause disconnects. 
-                extern bool deleteLogFile();
-                if (deleteLogFile()) {
-                    ESP_LOGI(TAG, "BLE COMMAND: LOG FILE DELETED");
-                } else {
-                    ESP_LOGE(TAG, "BLE COMMAND: ERROR DELETING LOG (Storage Busy)");
-                }
+                extern BLEManager bleManager;
+                bleManager.logDeleteRequested.store(true);
             }
         }
     }
@@ -76,7 +72,7 @@ public:
             } else {
                 *_bleManager->myDevice = advertisedDevice;
             }
-            _bleManager->doConnect = true;
+            _bleManager->doConnect.store(true);
             ESP_LOGI(TAG, "Found CSC sensor: %s", advertisedDevice.toString().c_str());
         }
     }
@@ -119,7 +115,7 @@ static void notifyCallback(BLERemoteCharacteristic* pBLERemoteCharacteristic, ui
             
             if (timeDelta > 0 && revDelta > 0) {
                 g_ble_ground_speed.store(((float)revDelta * WHEEL_CIRCUMFERENCE) / ((float)timeDelta / 1024.0f));
-                g_lastWheelUpdateMillis = millis(); // Update global timestamp
+                g_lastWheelUpdateMillis.store(millis());
             }
         }
         bleManager.lastWheelRevs = wheelRevs;
@@ -172,16 +168,27 @@ void BLEManager::begin(SystemConfig* config) {
 
 void BLEManager::startScanningForCSC() {
     BLEScan* pBLEScan = BLEDevice::getScan();
+    pBLEScan->clearResults();
     pBLEScan->setAdvertisedDeviceCallbacks(new MyAdvertisedDeviceCallbacks(this));
     pBLEScan->setActiveScan(true);
-    pBLEScan->start(5, false); // Scan for 5 seconds, then stop
+    pBLEScan->start(5, [](BLEScanResults) {}, false);
 }
 
 void BLEManager::handleClientConnection() {
-    if (doConnect == true) {
+    if (loggingToggleRequested.exchange(false)) {
+        const bool enabled = !sysConfig->loggingEnabled.load();
+        sysConfig->loggingEnabled.store(enabled);
+        ESP_LOGI(TAG, "BLE COMMAND: LOGGING %s", enabled ? "ENABLED" : "DISABLED");
+    }
+    if (logDeleteRequested.exchange(false)) {
+        extern bool deleteLogFile();
+        if (!deleteLogFile()) ESP_LOGE(TAG, "BLE COMMAND: ERROR DELETING LOG");
+    }
+    if (scanRequested.exchange(false)) startScanningForCSC();
+
+    if (doConnect.exchange(false)) {
         if (myDevice == nullptr) {
             ESP_LOGE(TAG, "Attempted to connect to null device.");
-            doConnect = false;
             return;
         }
 
@@ -195,7 +202,6 @@ void BLEManager::handleClientConnection() {
             if (!pClient->connect(myDevice)) {
                 ESP_LOGE(TAG, "Failed to connect to CSC sensor.");
                 startScanningForCSC(); // Restart scan if connection fails
-                doConnect = false;
                 return;
             }
         }
@@ -215,7 +221,6 @@ void BLEManager::handleClientConnection() {
             ESP_LOGE(TAG, "Failed to find CSC service.");
             pClient->disconnect();
             startScanningForCSC();
-            doConnect = false;
             return;
         }
         
@@ -224,7 +229,6 @@ void BLEManager::handleClientConnection() {
             ESP_LOGE(TAG, "Failed to find CSC characteristic.");
             pClient->disconnect();
             startScanningForCSC();
-            doConnect = false;
             return;
         }
         
@@ -237,7 +241,6 @@ void BLEManager::handleClientConnection() {
             pClient->disconnect();
             startScanningForCSC();
         }
-        doConnect = false;
     }
 }
 

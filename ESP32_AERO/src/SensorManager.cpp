@@ -10,23 +10,22 @@
 
 static const char* TAG = "SensorManager";
 
-static float decodeMS4525PressurePa(int16_t p_counts) {
-    const float spanCounts = MS4525DO_COUNTS_MAX - MS4525DO_COUNTS_MIN;
-    const float spanPsi    = MS4525DO_PRESSURE_MAX_PSI - MS4525DO_PRESSURE_MIN_PSI;
-    float diff_press_psi   = (((float)p_counts - MS4525DO_COUNTS_MIN) * spanPsi / spanCounts) + MS4525DO_PRESSURE_MIN_PSI;
-    return diff_press_psi * PSI_TO_PA;
-}
-
 // Global atomic for ground speed (declared extern in BLEManager.h)
 extern std::atomic<float> g_ble_ground_speed;
 // Global timestamp for last wheel update (declared extern in BLEManager.h)
-extern unsigned long g_lastWheelUpdateMillis;
+extern std::atomic<unsigned long> g_lastWheelUpdateMillis;
+std::atomic<uint32_t> g_sensorQueueDrops{0};
+std::atomic<uint32_t> g_i2cRecoveries{0};
+std::atomic<uint32_t> g_imuRecoveries{0};
  
 SensorManager::SensorManager() 
-    : as_filter(0.02f, 2.5f, 0.0f),
+    : as_filter(0.25f, 0.5f, 0.0f),
+      imu_x_filter(0.01f, 0.1f, 0.0f),
+      imu_y_filter(0.01f, 0.1f, 0.0f),
+      imu_z_filter(0.01f, 0.1f, 0.0f),
       _t_last(NAN), _p_last(NAN), _alt_last(NAN), _as_last(NAN), _rho_last(NAN), _gs_last(NAN),
-      _ema_alt(NAN), _alt_alpha(0.05f),
-      _alt_diff_acc(0.0f), _last_recorded_alt(NAN), _last_avg_alt(NAN),
+      _ema_alt(NAN), _alt_alpha(0.15f),
+      _alt_diff_acc(0.0f), _last_recorded_alt(NAN),
       _p_acc(0.0f), _t_acc(0.0f), _alt_acc(0.0f), _as_acc(0.0f), _rho_acc(0.0f), _gs_acc(0.0f),
       _p_n(0), _t_n(0), _alt_n(0), _as_n(0), _rho_n(0), _gs_n(0),
       _i2cInitialized(false), seaLevelPressure(101325.0f), as_offset_pa(0.0f), _i2cMutex(nullptr) {}
@@ -38,7 +37,22 @@ void SensorManager::begin(SystemConfig* config) {
     
     if (_i2cMutex == nullptr) {
         _i2cMutex = xSemaphoreCreateRecursiveMutex();
+        if (_i2cMutex == nullptr) {
+            ESP_LOGE(TAG, "Failed to create I2C mutex; external sensors disabled");
+            return;
+        }
     }
+
+#ifdef M5STACK_CAPSULE
+    const bool imuBusReady = M5.In_I2C.begin(
+        I2C_NUM_1, CAPSULE_IMU_SDA_PIN, CAPSULE_IMU_SCL_PIN);
+    imuAvailable = imuBusReady &&
+        M5.Imu.begin(&M5.In_I2C, m5::board_t::board_M5Capsule);
+    ESP_LOGI(TAG, "Capsule BMI270 IMU: %s", imuAvailable ? "ready" : "not found");
+#else
+    imuAvailable = false;
+    ESP_LOGI(TAG, "Built-in IMU disabled for non-Capsule build");
+#endif
 
     ESP_LOGI(TAG, "Initializing I2C Bus on SDA:%d, SCL:%d", I2C_SDA_PIN, I2C_SCL_PIN);
     Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
@@ -126,37 +140,39 @@ void SensorManager::calibrateSensors() {
     // Calibrate BMP (either 390 or 280)
     if (!bmpAvailable && !bmp280Available) {
         ESP_LOGW(TAG, "Calibration: BMP sensor not found, skipping.");
-        return;
-    }
-    
-    float sum = 0;
-    int samples = 20;
-    int validSamples = 0;
-
-    // Initial dummy readings to wake up the sensor IC
-    for(int i=0; i<3; i++) { 
-        if(bmpAvailable) bmp.performReading();
-        else if(bmp280Available) { bmp280.readPressure(); }
-        delay(20); 
-    }
-
-    for (int i = 0; i < samples; i++) {
-        if (bmpAvailable) {
-            if (bmp.performReading()) {
-                sum += bmp.pressure;
-                validSamples++;
-            }
-        } else if (bmp280Available) {
-            sum += bmp280.readPressure();
-            validSamples++;
-        }
-        delay(50);
-    }
-    if (validSamples > 0) {
-        seaLevelPressure = sum / (float)validSamples;
-        ESP_LOGI(TAG, "BMP calibrated. Sea level pressure: %.2f Pa", seaLevelPressure);
     } else {
-        ESP_LOGW(TAG, "BMP calibration failed: No valid samples obtained.");
+        float sum = 0;
+        const int samples = 20;
+        int validSamples = 0;
+
+        // Initial dummy readings to wake up the sensor IC
+        for (int i = 0; i < 3; i++) {
+            if (bmpAvailable) bmp.performReading();
+            else bmp280.readPressure();
+            delay(20);
+        }
+
+        for (int i = 0; i < samples; i++) {
+            if (bmpAvailable) {
+                if (bmp.performReading()) {
+                    sum += bmp.pressure;
+                    validSamples++;
+                }
+            } else {
+                const float pressure = bmp280.readPressure();
+                if (std::isfinite(pressure) && pressure > 0.0f) {
+                    sum += pressure;
+                    validSamples++;
+                }
+            }
+            delay(50);
+        }
+        if (validSamples > 0) {
+            seaLevelPressure = sum / static_cast<float>(validSamples);
+            ESP_LOGI(TAG, "BMP calibrated. Sea level pressure: %.2f Pa", seaLevelPressure);
+        } else {
+            ESP_LOGW(TAG, "BMP calibration failed: No valid samples obtained.");
+        }
     }
 
     // Calibrate Airspeed
@@ -165,33 +181,30 @@ void SensorManager::calibrateSensors() {
         return;
     }
     
-    sum = 0;
+    float sum = 0;
     const int as_samples = 40;
-    validSamples = 0;
-
-    int staleOrFaultSamples = 0;
+    int validSamples = 0;
 
     for (int i = 0; i < as_samples; i++) {
         if (Wire.requestFrom(MS4525DO_ADDR, 2) == 2) {
             uint8_t b0 = Wire.read();
             uint8_t b1 = Wire.read();
-            uint8_t status = (b0 >> 6) & 0x03;
-            if (status != 0) {
-                staleOrFaultSamples++;
+            if (((b0 >> 6) & 0x03) != 0) {
                 delay(20);
                 continue;
             }
             int16_t p_counts = ((b0 & 0x3F) << 8) | b1;
-            sum += decodeMS4525PressurePa(p_counts);
+            float diff_press_psi = ((((float)p_counts - 1638.4f) * 2.0f) / 13107.2f) - 1.0f;
+            sum += (diff_press_psi * 6894.76f);
             validSamples++;
         }
         delay(20);
     }
     if (validSamples > 0) {
         as_offset_pa = sum / (float)validSamples;
-        ESP_LOGI(TAG, "Airspeed sensor calibrated. Offset: %.2f Pa (%d valid, %d stale/fault)", as_offset_pa, validSamples, staleOrFaultSamples);
+        ESP_LOGI(TAG, "Airspeed sensor calibrated. Offset: %.2f Pa", as_offset_pa);
     } else {
-        ESP_LOGW(TAG, "Airspeed sensor calibration failed: No valid samples obtained (%d stale/fault).", staleOrFaultSamples);
+        ESP_LOGW(TAG, "Airspeed sensor calibration failed: No valid samples obtained.");
     }
 }
 
@@ -199,6 +212,7 @@ void SensorManager::recoverI2CBus() {
     if (_i2cMutex != nullptr) xSemaphoreTakeRecursive(_i2cMutex, portMAX_DELAY);
 
     ESP_LOGW(TAG, "Attempting I2C bus recovery...");
+    g_i2cRecoveries.fetch_add(1);
     Wire.end();
     
     pinMode(I2C_SDA_PIN, INPUT);
@@ -238,13 +252,85 @@ float SensorManager::calculateAltitude(float currentPressure, float referencePre
 
 float SensorManager::calculateAirDensity(float tempC, float pressurePa) {
     const float GAS_CONSTANT = 287.05f; // J/(kg*K)
-    float p = std::isnan(pressurePa) ? SEA_LEVEL_PRESSURE_PA : pressurePa;
-    float rho = p / (GAS_CONSTANT * (tempC + 273.15f));
-
-    if (fabs(rho - RHO_AIR_DENSITY) > (0.10f * RHO_AIR_DENSITY)) {
-        return RHO_AIR_DENSITY; 
+    const float tempK = tempC + 273.15f;
+    if (!std::isfinite(tempK) || tempK <= 0.0f ||
+        !std::isfinite(pressurePa) || pressurePa <= 0.0f) {
+        return RHO_AIR_DENSITY;
     }
-    return rho;
+    return pressurePa / (GAS_CONSTANT * tempK);
+}
+
+float SensorManager::estimateClimbRate(float verticalAccelerationMps2,
+                                       unsigned long timestampMs) {
+    // _alt_last is populated by either BMP390 or BMP280 and remains NAN when
+    // no supported barometer is available.
+    const float barometricAltitudeM = _alt_last;
+
+    if (_climb_last_ms == 0) {
+        _climb_last_ms = timestampMs;
+        _climb_last_alt_m = barometricAltitudeM;
+        _climb_last_baro_ms = timestampMs;
+        return _climb_rate_mps;
+    }
+
+    const float dt = (timestampMs - _climb_last_ms) * 0.001f;
+    _climb_last_ms = timestampMs;
+
+    // Reject timing gaps so a pause or rollover cannot create a velocity jump.
+    if (dt <= 0.0f || dt > 0.25f) {
+        _climb_last_alt_m = barometricAltitudeM;
+        _climb_last_baro_ms = timestampMs;
+        return _climb_rate_mps;
+    }
+
+    if (std::isfinite(verticalAccelerationMps2)) {
+        // Ignore residual IMU noise/gravity-removal error near zero.
+        constexpr float ACCEL_DEADZONE_MPS2 = 0.05f;
+        const float a = fabsf(verticalAccelerationMps2) < ACCEL_DEADZONE_MPS2
+                            ? 0.0f
+                            : verticalAccelerationMps2;
+        _climb_rate_mps += a * dt;
+    }
+
+    if (std::isfinite(barometricAltitudeM)) {
+        const bool altitudeChanged = !std::isfinite(_climb_last_alt_m) ||
+            fabsf(barometricAltitudeM - _climb_last_alt_m) > 0.0001f;
+        if (altitudeChanged && std::isfinite(_climb_last_alt_m)) {
+            const float baroDt = (timestampMs - _climb_last_baro_ms) * 0.001f;
+            const float rawBaroRate = baroDt > 0.0f
+                ? (barometricAltitudeM - _climb_last_alt_m) / baroDt
+                : 0.0f;
+
+            // Reject implausible single-sample pressure spikes, then low-pass
+            // the BMP390- or BMP280-derived rate to arrest integration drift.
+            if (fabsf(rawBaroRate) <= 20.0f) {
+                constexpr float BARO_RATE_ALPHA = 0.08f;
+                _climb_baro_rate_mps +=
+                    BARO_RATE_ALPHA * (rawBaroRate - _climb_baro_rate_mps);
+
+            }
+        }
+        if (altitudeChanged) {
+            _climb_last_alt_m = barometricAltitudeM;
+            _climb_last_baro_ms = timestampMs;
+        }
+
+        // Apply the latest barometric correction continuously between the
+        // slower pressure-sensor updates.
+        constexpr float BARO_CORRECTION = 0.02f;
+        _climb_rate_mps += BARO_CORRECTION *
+                           (_climb_baro_rate_mps - _climb_rate_mps);
+    }
+
+    return _climb_rate_mps;
+}
+
+void SensorManager::resetClimbRateEstimator() {
+    _climb_rate_mps = 0.0f;
+    _climb_baro_rate_mps = 0.0f;
+    _climb_last_alt_m = NAN;
+    _climb_last_ms = 0;
+    _climb_last_baro_ms = 0;
 }
 
 bool SensorManager::_readRawAirspeedSensor(float &raw_airspeed_diff_press_pa, float &internal_sensor_temp_c, float ambient_pressure_pa) {
@@ -262,23 +348,18 @@ bool SensorManager::_readRawAirspeedSensor(float &raw_airspeed_diff_press_pa, fl
     }
 
     uint8_t status = (buffer[0] >> 6) & 0x03;
-    if (status != 0) {
+    // MS4525DO status 2 means the returned measurement is valid but stale.
+    // This is expected when polling faster than a new conversion is produced
+    // and must not be treated as an I2C bus failure. Status 1 is command mode
+    // and status 3 indicates a diagnostic fault.
+    if (status == 1 || status == 3) {
         xSemaphoreGiveRecursive(_i2cMutex);
         return false; 
     }
 
     int16_t p_counts = ((buffer[0] & 0x3F) << 8) | buffer[1];
-    float raw_pressure_pa = decodeMS4525PressurePa(p_counts);
-    raw_airspeed_diff_press_pa = raw_pressure_pa - as_offset_pa; 
-
-    #ifdef DEBUG_AIRSPEED_RAW
-    static unsigned long lastRawLog = 0;
-    unsigned long now = millis();
-    if (now - lastRawLog >= 1000 || lastRawLog == 0) {
-        lastRawLog = now;
-        Serial.printf("\n[AS] c=%d raw=%.1f off=%.1f corr=%.1f\n", p_counts, raw_pressure_pa, as_offset_pa, raw_airspeed_diff_press_pa);
-    }
-    #endif
+    float diff_press_psi = ((((float)p_counts - 1638.4f) * 2.0f) / 13107.2f) - 1.0f;
+    raw_airspeed_diff_press_pa = (diff_press_psi * 6894.76f) - as_offset_pa;
 
     int16_t t_counts = (buffer[2] << 8 | buffer[3]) >> 5;
     internal_sensor_temp_c      = ((float)t_counts * 200.0f / 2047.0f) - 50.0f; 
@@ -307,8 +388,15 @@ bool SensorManager::_readBmpData() {
     if (bmpAvailable) {
         if (_i2cMutex == nullptr || xSemaphoreTakeRecursive(_i2cMutex, pdMS_TO_TICKS(20)) != pdTRUE) return false;
         if (bmp.performReading()) {
+            if (!std::isfinite(bmp.temperature) || bmp.temperature <= -80.0f ||
+                bmp.temperature >= 100.0f || !std::isfinite(bmp.pressure) ||
+                bmp.pressure <= 10000.0f || bmp.pressure >= 120000.0f) {
+                xSemaphoreGiveRecursive(_i2cMutex);
+                return false;
+            }
             _t_last = bmp.temperature;
             _p_last = bmp.pressure;
+            _rho_last = calculateAirDensity(_t_last, _p_last);
             float raw_alt = calculateAltitude(_p_last, getSeaLevelPressure());
 
             if (std::isnan(_ema_alt)) _ema_alt = raw_alt;
@@ -320,27 +408,122 @@ bool SensorManager::_readBmpData() {
         xSemaphoreGiveRecursive(_i2cMutex);
     } else if (bmp280Available) {
         if (_i2cMutex == nullptr || xSemaphoreTakeRecursive(_i2cMutex, pdMS_TO_TICKS(20)) != pdTRUE) return false;
-        _t_last = bmp280.readTemperature();
-        _p_last = bmp280.readPressure();
-        float raw_alt = calculateAltitude(_p_last, getSeaLevelPressure());
-
-        if (std::isnan(_ema_alt)) _ema_alt = raw_alt;
-        else _ema_alt = (_alt_alpha * raw_alt) + ((1.0f - _alt_alpha) * _ema_alt);
-        _alt_last = _ema_alt;
-        
-        success = true;
+        const float temp = bmp280.readTemperature();
+        const float pressure = bmp280.readPressure();
+        if (std::isfinite(temp) && temp > -80.0f && temp < 100.0f &&
+            std::isfinite(pressure) && pressure > 10000.0f && pressure < 120000.0f) {
+            _t_last = temp;
+            _p_last = pressure;
+            _rho_last = calculateAirDensity(_t_last, _p_last);
+            const float raw_alt = calculateAltitude(_p_last, getSeaLevelPressure());
+            if (std::isnan(_ema_alt)) _ema_alt = raw_alt;
+            else _ema_alt = (_alt_alpha * raw_alt) + ((1.0f - _alt_alpha) * _ema_alt);
+            _alt_last = _ema_alt;
+            success = true;
+        }
         xSemaphoreGiveRecursive(_i2cMutex);
     } else {
         _p_last = _alt_last = NAN;
+        _rho_last = NAN;
         if (!ahtAvailable) _t_last = NAN;
         success = true; 
     }
     return success;
 }
 
+bool SensorManager::_readImuData() {
+#ifdef M5STACK_CAPSULE
+    if (!imuAvailable || !M5.Imu.update()) return false;
+
+    const m5::imu_data_t data = M5.Imu.getImuData();
+    if (!_imuFiltersInitialized) {
+        // Seed each filter with the first sample to avoid a startup ramp from zero.
+        imu_x_filter.setState(data.accel.x);
+        imu_y_filter.setState(data.accel.y);
+        imu_z_filter.setState(data.accel.z);
+        _imuFiltersInitialized = true;
+    }
+
+    _imu_x_last = imu_x_filter.update(data.accel.x);
+    _imu_y_last = imu_y_filter.update(data.accel.y);
+    _imu_z_last = imu_z_filter.update(data.accel.z);
+
+    // Track the gravity direction in device coordinates. Gyroscope integration
+    // supplies fast pitch/roll response; a slow accelerometer correction bounds
+    // drift when the measured magnitude is reasonably close to 1 g.
+    constexpr float DEG_TO_RAD_F = 0.01745329252f;
+    constexpr float STANDARD_GRAVITY_MPS2 = 9.80665f;
+    const unsigned long attitudeNow = millis();
+    const float accelMagnitudeG = sqrtf(
+        _imu_x_last * _imu_x_last +
+        _imu_y_last * _imu_y_last +
+        _imu_z_last * _imu_z_last);
+
+    if (!_gravityInitialized && accelMagnitudeG > 0.1f) {
+        _gravity_x_g = _imu_x_last / accelMagnitudeG;
+        _gravity_y_g = _imu_y_last / accelMagnitudeG;
+        _gravity_z_g = _imu_z_last / accelMagnitudeG;
+        _gravityInitialized = true;
+    } else if (_gravityInitialized) {
+        const float dt = (attitudeNow - _imu_attitude_last_ms) * 0.001f;
+        if (dt > 0.0f && dt <= 0.25f) {
+            const float wx = data.gyro.x * DEG_TO_RAD_F;
+            const float wy = data.gyro.y * DEG_TO_RAD_F;
+            const float wz = data.gyro.z * DEG_TO_RAD_F;
+
+            const float oldGx = _gravity_x_g;
+            const float oldGy = _gravity_y_g;
+            const float oldGz = _gravity_z_g;
+            _gravity_x_g += (oldGy * wz - oldGz * wy) * dt;
+            _gravity_y_g += (oldGz * wx - oldGx * wz) * dt;
+            _gravity_z_g += (oldGx * wy - oldGy * wx) * dt;
+
+            if (accelMagnitudeG > 0.9f && accelMagnitudeG < 1.1f) {
+                constexpr float ACCEL_GRAVITY_CORRECTION = 0.005f;
+                _gravity_x_g += ACCEL_GRAVITY_CORRECTION *
+                    ((_imu_x_last / accelMagnitudeG) - _gravity_x_g);
+                _gravity_y_g += ACCEL_GRAVITY_CORRECTION *
+                    ((_imu_y_last / accelMagnitudeG) - _gravity_y_g);
+                _gravity_z_g += ACCEL_GRAVITY_CORRECTION *
+                    ((_imu_z_last / accelMagnitudeG) - _gravity_z_g);
+            }
+
+            const float gravityNorm = sqrtf(
+                _gravity_x_g * _gravity_x_g +
+                _gravity_y_g * _gravity_y_g +
+                _gravity_z_g * _gravity_z_g);
+            if (gravityNorm > 0.1f) {
+                _gravity_x_g /= gravityNorm;
+                _gravity_y_g /= gravityNorm;
+                _gravity_z_g /= gravityNorm;
+            }
+        }
+    }
+    _imu_attitude_last_ms = attitudeNow;
+
+    const float linearXG = _imu_x_last - _gravity_x_g;
+    const float linearYG = _imu_y_last - _gravity_y_g;
+    const float linearZG = _imu_z_last - _gravity_z_g;
+
+    // The Capsule's USB-facing direction is -Y.
+    _forward_accel_mps2 = -linearYG * STANDARD_GRAVITY_MPS2;
+
+    // Project linear acceleration onto earth-up (the estimated gravity vector).
+    const float verticalAccelerationMps2 =
+        (linearXG * _gravity_x_g + linearYG * _gravity_y_g +
+         linearZG * _gravity_z_g) * STANDARD_GRAVITY_MPS2;
+    _climb_rate_mps = estimateClimbRate(verticalAccelerationMps2, millis());
+    return true;
+#else
+    _imu_x_last = _imu_y_last = _imu_z_last = NAN;
+    return false;
+#endif
+}
+
 bool SensorManager::_readAirspeedData() {
     float raw_diff_press_pa = 0;
     float internal_sensor_temp_c = NAN;
+    float raw_as = 0;
     bool success = false; 
 
     if (asAvailable) {
@@ -349,30 +532,16 @@ bool SensorManager::_readAirspeedData() {
             float calc_press = std::isnan(_p_last) ? getSeaLevelPressure() : _p_last;
 
             _rho_last = calculateAirDensity(calc_temp, calc_press);
-            float corrected_press_pa = 0.0f;
-            if (raw_diff_press_pa > AIRSPEED_PRESSURE_DEADBAND_PA) {
-                corrected_press_pa = raw_diff_press_pa;
-                _as_zero_candidate_count = 0;
-            } else if (!std::isnan(_as_last) && _as_last > 0.1f &&
-                       _as_zero_candidate_count < AIRSPEED_ZERO_CONFIRM_SAMPLES) {
-                _as_zero_candidate_count++;
-                return true;
-            } else {
-                _as_zero_candidate_count = AIRSPEED_ZERO_CONFIRM_SAMPLES;
-            }
-
-            float raw_as = (corrected_press_pa > 0.0f) ? sqrtf(2.0f * corrected_press_pa / _rho_last) : 0.0f;
-            getAirspeedData(raw_as, _as_last);
+            raw_as = (raw_diff_press_pa > 0) ? sqrtf(2.0f * raw_diff_press_pa / _rho_last) : 0.0f;
             success = true;
         } else {
             success = false;
         }
     } else {
-        _as_last = NAN;
-        _rho_last = NAN;
         success = true; 
     }
 
+    getAirspeedData(raw_as, _as_last);
     return success;
 }
 
@@ -380,6 +549,9 @@ void SensorManager::recordSample(const QueueData &data) {
     if (!std::isnan(data.pressure))    { _p_acc   += data.pressure; _p_n++; }
     if (!std::isnan(data.temp))        { _t_acc   += data.temp; _t_n++; }
     if (!std::isnan(data.altitude))    { 
+        if (!std::isnan(_last_recorded_alt)) {
+            _alt_diff_acc += (data.altitude - _last_recorded_alt);
+        }
         _last_recorded_alt = data.altitude;
         _alt_acc += data.altitude; 
         _alt_n++; 
@@ -387,10 +559,18 @@ void SensorManager::recordSample(const QueueData &data) {
     if (!std::isnan(data.airspeed))    { _as_acc += data.airspeed; _as_n++; }
     if (!std::isnan(data.air_rho))     { _rho_acc += data.air_rho; _rho_n++; }
     if (!std::isnan(data.ground_speed)) { _gs_acc += data.ground_speed; _gs_n++; }
+    if (!std::isnan(data.climb_rate)) { _climb_rate_acc += data.climb_rate; _climb_rate_n++; }
+    if (!std::isnan(data.forward_accel)) { _forward_accel_acc += data.forward_accel; _forward_accel_n++; }
+    if (!std::isnan(data.accel_x) && !std::isnan(data.accel_y) && !std::isnan(data.accel_z)) {
+        _imu_x_acc += data.accel_x;
+        _imu_y_acc += data.accel_y;
+        _imu_z_acc += data.accel_z;
+        _imu_n++;
+    }
 }
 
 void SensorManager::getAveragedTelemetry(QueueData &outData, float &altChange) {
-    outData = {NAN, NAN, NAN, NAN, NAN, NAN};
+    outData = {NAN, NAN, NAN, NAN, NAN, NAN, NAN, NAN, NAN, NAN, NAN};
     altChange = 0.0f;
 
     if (_p_n > 0)   outData.pressure = _p_acc / (float)_p_n;
@@ -399,13 +579,16 @@ void SensorManager::getAveragedTelemetry(QueueData &outData, float &altChange) {
     if (_as_n > 0)  outData.airspeed = _as_acc / (float)_as_n;
     if (_rho_n > 0) outData.air_rho  = _rho_acc / (float)_rho_n;
     if (_gs_n > 0)  outData.ground_speed = _gs_acc / (float)_gs_n;
+    if (_climb_rate_n > 0) outData.climb_rate = _climb_rate_acc / (float)_climb_rate_n;
+    if (_forward_accel_n > 0) outData.forward_accel = _forward_accel_acc / (float)_forward_accel_n;
+    if (_imu_n > 0) {
+        outData.accel_x = _imu_x_acc / (float)_imu_n;
+        outData.accel_y = _imu_y_acc / (float)_imu_n;
+        outData.accel_z = _imu_z_acc / (float)_imu_n;
+    }
 
-    if ((bmpAvailable || bmp280Available) && _alt_n > 0 && !std::isnan(outData.altitude)) {
-        if (!std::isnan(_last_avg_alt)) {
-            altChange = outData.altitude - _last_avg_alt;
-        }
-        _last_avg_alt = outData.altitude;
-
+    if ((bmpAvailable || bmp280Available)) {
+        altChange = _alt_diff_acc;
         if (std::abs(altChange) < ALT_CHANGE_DEADZONE) {
             altChange = 0.0f;
         }
@@ -413,16 +596,17 @@ void SensorManager::getAveragedTelemetry(QueueData &outData, float &altChange) {
 
     if (_alt_n == 0) {
         _last_recorded_alt = NAN;
-        _last_avg_alt = NAN;
     }
 
-    _p_acc = _t_acc = _alt_acc = _as_acc = _rho_acc = _gs_acc = _alt_diff_acc = 0.0f;
+    _p_acc = _t_acc = _alt_acc = _as_acc = _rho_acc = _gs_acc = _climb_rate_acc = _forward_accel_acc = _alt_diff_acc = 0.0f;
+    _imu_x_acc = _imu_y_acc = _imu_z_acc = 0.0f;
     _p_n = _t_n = _alt_n = _as_n = _rho_n = _gs_n = 0;
+    _climb_rate_n = _forward_accel_n = _imu_n = 0;
 }
 
 void SensorManager::getAirspeedData(float measurement, float &smoothed_as) {
     float val = as_filter.update(measurement);
-    if (val < 0.1f) { 
+    if (val < 0.03f) {
         val = 0.0f;
         as_filter.setState(0.0f);
     }
@@ -433,45 +617,59 @@ bool SensorManager::updateSingleCore(QueueData &outData) {
     static unsigned long lastBmpRead = 0;
     static unsigned long lastAirspeedRead = 0;
     static unsigned long lastAhtRead = 0;
-    static int local_i2c_errors = 0;
+    static unsigned long lastImuRead = 0;
+    static int bmpErrors = 0, ahtErrors = 0, airspeedErrors = 0;
+    static unsigned long lastRecovery = 0;
 
     unsigned long now = millis();
     bool updated = false;
+    bool imuUpdated = false;
+
+    if (now - lastImuRead >= IMU_READ_INTERVAL || lastImuRead == 0) {
+        lastImuRead = now;
+        imuUpdated = _readImuData();
+    }
 
     // --- BMP Reading ---
     if (now - lastBmpRead >= BMP_READ_INTERVAL || lastBmpRead == 0) {
         lastBmpRead = now;
-        if (_readBmpData()) {
-            local_i2c_errors = 0;
-        } else {
-            local_i2c_errors++;
-        }
+        const bool ok = _readBmpData();
+        if (bmpAvailable || bmp280Available) bmpErrors = ok ? 0 : bmpErrors + 1;
     }
 
     // --- AHT Reading ---
     if (now - lastAhtRead >= AHT_READ_INTERVAL || lastAhtRead == 0) {
         lastAhtRead = now;
-        if (_readAhtData()) {
-            local_i2c_errors = 0;
-        }
+        const bool ok = _readAhtData();
+        if (ahtAvailable) ahtErrors = ok ? 0 : ahtErrors + 1;
     }
 
     // --- Airspeed Reading ---
     if (now - lastAirspeedRead >= AIRSPEED_READ_INTERVAL || lastAirspeedRead == 0) {
         lastAirspeedRead = now;
-        if (!_readAirspeedData()) {
-            local_i2c_errors++;
-        }
+        const bool ok = _readAirspeedData();
+        if (asAvailable) airspeedErrors = ok ? 0 : airspeedErrors + 1;
         updated = true; 
     }
 
-    if (local_i2c_errors >= I2C_MAX_ERRORS) {
-        recoverI2CBus();
-        local_i2c_errors = 0;
+    if (bmpErrors >= I2C_MAX_ERRORS || ahtErrors >= I2C_MAX_ERRORS ||
+        airspeedErrors >= I2C_MAX_ERRORS) {
+        if (now - lastRecovery >= 5000 || lastRecovery == 0) {
+            ESP_LOGW(TAG, "I2C recovery trigger: BMP=%d AHT=%d Airspeed=%d",
+                     bmpErrors, ahtErrors, airspeedErrors);
+            recoverI2CBus();
+            lastRecovery = millis();
+            bmpErrors = ahtErrors = airspeedErrors = 0;
+        }
     }
 
-    _gs_last = (now - g_lastWheelUpdateMillis > 3000) ? NAN : g_ble_ground_speed.load();
-    outData = {_t_last, _p_last, _as_last, _alt_last, _rho_last, _gs_last};
+    _gs_last = (now - g_lastWheelUpdateMillis.load() > 3000) ? NAN : g_ble_ground_speed.load();
+    outData = {_t_last, _p_last, _as_last, _alt_last, _rho_last, _gs_last,
+               imuUpdated ? _climb_rate_mps : NAN,
+               imuUpdated ? _forward_accel_mps2 : NAN,
+               imuUpdated ? _imu_x_last : NAN,
+               imuUpdated ? _imu_y_last : NAN,
+               imuUpdated ? _imu_z_last : NAN};
     return updated;
 }
 
@@ -495,46 +693,70 @@ void sensorTask(void *pvParameters) {
     unsigned long lastBmpRead = 0;
     unsigned long lastAirspeedRead = 0;
     unsigned long lastAhtRead = 0;
-    int local_i2c_errors = 0;
+    unsigned long lastImuRead = 0;
+    int bmpErrors = 0, ahtErrors = 0, airspeedErrors = 0, imuErrors = 0;
+    unsigned long lastRecovery = 0;
 
     for (;;) {
         unsigned long now = millis();
         bool bmpUpdated = false;
         bool asUpdated = false;
         bool ahtUpdated = false;
+        bool imuUpdated = false;
+
+        if (now - lastImuRead >= IMU_READ_INTERVAL || lastImuRead == 0) {
+            lastImuRead = now;
+            imuUpdated = sensorManager->_readImuData();
+            if (sensorManager->imuAvailable) imuErrors = imuUpdated ? 0 : imuErrors + 1;
+#ifdef M5STACK_CAPSULE
+            if (imuErrors >= I2C_MAX_ERRORS) {
+                sensorManager->imuAvailable =
+                    M5.Imu.begin(&M5.In_I2C, m5::board_t::board_M5Capsule);
+                sensorManager->_imuFiltersInitialized = false;
+                sensorManager->_gravityInitialized = false;
+                sensorManager->resetClimbRateEstimator();
+                g_imuRecoveries.fetch_add(1);
+                imuErrors = 0;
+            }
+#endif
+        }
 
         // --- AHT Reading ---
         if (now - lastAhtRead >= AHT_READ_INTERVAL || lastAhtRead == 0) {
             lastAhtRead = now;
             ahtUpdated = sensorManager->_readAhtData();
-            if (!ahtUpdated && sensorManager->ahtAvailable) local_i2c_errors++;
+            if (sensorManager->ahtAvailable) ahtErrors = ahtUpdated ? 0 : ahtErrors + 1;
         }
 
         // --- BMP Reading ---
         if (now - lastBmpRead >= BMP_READ_INTERVAL || lastBmpRead == 0) {
             lastBmpRead = now;
             bmpUpdated = sensorManager->_readBmpData();
-            if (!bmpUpdated && (sensorManager->bmpAvailable || sensorManager->bmp280Available)) {
-                local_i2c_errors++;
-            } else {
-                local_i2c_errors = 0;
-            }
+            if (sensorManager->bmpAvailable || sensorManager->bmp280Available)
+                bmpErrors = bmpUpdated ? 0 : bmpErrors + 1;
         }
 
         // --- Airspeed Reading & Smoothing ---
         if (now - lastAirspeedRead >= AIRSPEED_READ_INTERVAL || lastAirspeedRead == 0) {
             lastAirspeedRead = now;
             asUpdated = sensorManager->_readAirspeedData();
-            if (!asUpdated && sensorManager->asAvailable) local_i2c_errors++;
+            if (sensorManager->asAvailable)
+                airspeedErrors = asUpdated ? 0 : airspeedErrors + 1;
         }
 
-        if (local_i2c_errors >= I2C_MAX_ERRORS) {
-            sensorManager->recoverI2CBus();
-            local_i2c_errors = 0;
+        if (bmpErrors >= I2C_MAX_ERRORS || ahtErrors >= I2C_MAX_ERRORS ||
+            airspeedErrors >= I2C_MAX_ERRORS) {
+            if (now - lastRecovery >= 5000 || lastRecovery == 0) {
+                ESP_LOGW(TAG, "I2C recovery trigger: BMP=%d AHT=%d Airspeed=%d",
+                         bmpErrors, ahtErrors, airspeedErrors);
+                sensorManager->recoverI2CBus();
+                lastRecovery = millis();
+                bmpErrors = ahtErrors = airspeedErrors = 0;
+            }
         }
 
         // Ground speed timeout check
-        if (now - g_lastWheelUpdateMillis > 3000) {
+        if (now - g_lastWheelUpdateMillis.load() > 3000) {
             g_ble_ground_speed.store(NAN);
             sensorManager->_gs_last = NAN;
         } else {
@@ -546,10 +768,21 @@ void sensorTask(void *pvParameters) {
         data.pressure     = bmpUpdated ? sensorManager->_p_last    : NAN;
         data.altitude     = bmpUpdated ? sensorManager->_alt_last  : NAN;
         data.airspeed     = asUpdated  ? sensorManager->_as_last   : NAN;
-        data.air_rho      = asUpdated  ? sensorManager->_rho_last  : NAN;
+        // Air density comes from the barometer and remains available even when
+        // the separate MS4525DO differential-pressure sensor is disconnected.
+        data.air_rho      = bmpUpdated ? sensorManager->_rho_last  : NAN;
         data.ground_speed = sensorManager->_gs_last; 
+        data.climb_rate   = imuUpdated ? sensorManager->_climb_rate_mps : NAN;
+        data.forward_accel = imuUpdated ? sensorManager->_forward_accel_mps2 : NAN;
+        data.accel_x      = imuUpdated ? sensorManager->_imu_x_last : NAN;
+        data.accel_y      = imuUpdated ? sensorManager->_imu_y_last : NAN;
+        data.accel_z      = imuUpdated ? sensorManager->_imu_z_last : NAN;
 
-        xQueueSend(sensorQueue, &data, 0);
+        if (imuUpdated || bmpUpdated || ahtUpdated || asUpdated) {
+            if (xQueueSend(sensorQueue, &data, 0) != pdTRUE) {
+                g_sensorQueueDrops.fetch_add(1);
+            }
+        }
         vTaskDelay(10 / portTICK_PERIOD_MS);
     }
 }
