@@ -9,3 +9,106 @@ in the development cycle.
 
 More information about PlatformIO Unit Testing:
 - https://docs.platformio.org/en/latest/advanced/unit-testing/index.html
+
+## Hardware resilience tests
+
+### Platform build matrix
+
+Compile every supported firmware target without uploading:
+
+```bash
+test/build_platform_matrix.sh
+```
+
+The matrix currently contains:
+
+- `m5stack-capsule-v1_1`: Capsule pins, power hold, RTC and internal IMU.
+- `m5stack-stamps3-generic`: bare StampS3/custom carrier without Capsule assumptions.
+- `esp32-s3-devkitc-1`: generic ESP32-S3 DevKitC target.
+
+Build testing catches conditional-compilation and dependency problems. Each
+physical board should also run the serial hardware tests because compilation
+cannot validate wiring, I2C pull-ups, SD signal integrity or sensor presence.
+
+Install the one host dependency:
+
+```bash
+python3 -m pip install -r test/requirements-hardware.txt
+```
+
+Stop any PlatformIO serial monitor before running a test; only one process can
+own the serial port. Flash the current firmware, exit the monitor, then run a
+scenario. Each command exits zero on pass and nonzero on failure.
+
+Baseline Capsule with all sensors:
+
+```bash
+python3 test/hardware_resilience_test.py sensor-matrix \
+  --airspeed present --bmp present --temperature present --imu present
+```
+
+The equivalent named profile is:
+
+```bash
+python3 test/hardware_resilience_test.py sensor-matrix --profile capsule-all
+```
+
+Examples for other combinations:
+
+```bash
+# Capsule alone, with no external sensors
+python3 test/hardware_resilience_test.py sensor-matrix \
+  --airspeed absent --bmp absent --temperature absent --imu present
+
+# BMP280 or BMP390 only, plus the Capsule IMU
+python3 test/hardware_resilience_test.py sensor-matrix \
+  --airspeed absent --bmp present --temperature present --imu present
+```
+
+Available profiles are `capsule-all`, `capsule-bare`, `stamp-generic`, and
+`devkit-bare`. Individual `--airspeed`, `--bmp`, `--temperature`, and `--imu`
+arguments override a profile when explicitly set to `present` or `absent`.
+
+Guided fault tests:
+
+```bash
+python3 test/hardware_resilience_test.py i2c-interruption
+python3 test/hardware_resilience_test.py sd-removal
+python3 test/hardware_resilience_test.py sd-full
+python3 test/hardware_resilience_test.py corrupt-filesystem
+python3 test/hardware_resilience_test.py queue-saturation --duration 120
+```
+
+The SD-full test expects a mounted card with less than one 6 KB RAM log buffer
+of free space. The corrupt-filesystem test expects a deliberately invalid
+LittleFS partition and no SD card. Those tests do not corrupt or fill media
+themselves.
+
+Run the serial-parser unit tests without hardware:
+
+```bash
+python3 -m unittest discover -s test -p 'test_hardware_resilience_parser.py'
+```
+
+Run the ordinary all-sensors check followed by a 60-second queue soak:
+
+```bash
+test/run_hardware_tests.sh /dev/cu.usbmodem11101
+```
+
+
+ear/flashmon.sh
+
+pio run --target upload --upload-port /dev/cu.usbmodem11101
+pio device monitor --port /dev/cu.usbmodem11101 --baud 115200
+
+
+pio run --target upload --upload-port /dev/cu.usbmodem11101 && sleep 2 && pio device monitor --port /dev/cu.usbmodem11101 --baud 115200
+
+lsof /dev/cu.usbmodem11101
+Show only its process ID:
+lsof -t /dev/cu.usbmodem11101
+Stop that process gracefully:
+kill "$(lsof -t /dev/cu.usbmodem11101)"
+If it refuses to stop, force it:
+kill -9 "$(lsof -t /dev/cu.usbmodem11101)"

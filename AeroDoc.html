@@ -246,14 +246,14 @@ data managed by the ESP32 hub. It automatically uses the most accurate
 variables available while retaining Garmin and other less precise data
 sources as fallbacks.</p>
 <p><strong><u>Summary of forcing acting on the cyclist:</u></strong></p>
-<p><img src="CdA_Calculator/AeroDoc_Git/media/image1.png"
+<p><img src="AeroDoc_Git/media/image1.png"
 style="width:6.75347in;height:3.67986in" /></p>
 <p>We need solve the <em>Bicycle Equations of Motion</em> in near real
 time; because cyclists bodies are flexible, unlike aircraft/cars,
 shifting body position alters both frontal area and areodynamic
 characteristics.  So we combine the Coefficient of Drag (Cd) and Area
 (A) into a single metric—CdA.</p>
-<p><img src="CdA_Calculator/AeroDoc_Git/media/image2.png"
+<p><img src="AeroDoc_Git/media/image2.png"
 style="width:6.98958in;height:3.80903in" /></p>
 <p>CdA estimation relies on categorizing power consumption components,
 isolating the drag, then breaking out the CdA.</p>
@@ -261,7 +261,7 @@ isolating the drag, then breaking out the CdA.</p>
 <p>This is ride-time display unit, the measures are independently
 useful. CdA is and stable, within narrow ranges, e.g.: slow speeds, on
 climbs, or rapid speed changes, make it uninteresting.</p>
-<p><img src="CdA_Calculator/AeroDoc_Git/media/image3.png"
+<p><img src="AeroDoc_Git/media/image3.png"
 style="width:2.89109in;height:3.87686in" /></p>
 <p>This is an entertaining programming problem, and an introduction to
 sensor technologies, M5Stack (<a
@@ -404,7 +404,7 @@ unreliable.</p></li>
 Sensor Hub via Bluetooth Low Energy (BLE) messages.</p></li>
 </ul>
 <h3 id="user-interface">User Interface</h3>
-<p><img src="CdA_Calculator/AeroDoc_Git/media/image4.png"
+<p><img src="AeroDoc_Git/media/image4.png"
 style="width:6.75347in;height:6.39861in" /></p>
 <p>Garmin headsets can’t easily send commands or data to the sensor hub,
 e.g.: send the defined, wheel circumference or recorded rider mass.
@@ -412,7 +412,7 @@ However, it’s possible by attaching BLE messages to button presses. (not
 tested this one).</p>
 <h3 id="cda-graph">CdA Graph</h3>
 <p>Example test data stream</p>
-<p><img src="CdA_Calculator/AeroDoc_Git/media/image5.png"
+<p><img src="AeroDoc_Git/media/image5.png"
 style="width:6.75347in;height:3.37708in" /></p>
 <h2 id="garmin-only">Garmin-only</h2>
 <p>Garmin’s OS collects raw metrics, processes them in internal filters,
@@ -615,7 +615,7 @@ BLE.</p>
 <h3
 id="logical-relationship-between-garmin-and-sensor-hub"><strong>Logical
 Relationship between Garmin and Sensor Hub</strong></h3>
-<p><img src="CdA_Calculator/AeroDoc_Git/media/image6.png"
+<p><img src="AeroDoc_Git/media/image6.png"
 style="width:6.98871in;height:5.22747in" /></p>
 <h2 id="sensor-hub-architecture"><strong>Sensor Hub
 Architecture</strong></h2>
@@ -746,7 +746,7 @@ development Serial Monitor a command menu is available:</p>
 <h3 id="sensor-hub-logical-flow"><strong>Sensor Hub Logical
 Flow</strong></h3>
 <blockquote>
-<p><img src="CdA_Calculator/AeroDoc_Git/media/image7.png"
+<p><img src="AeroDoc_Git/media/image7.png"
 style="width:6.41667in;height:8.30556in" /></p>
 </blockquote>
 <p>Ground speed is received by Sensor Hub, but not used in current
@@ -862,7 +862,7 @@ ground reference.</h3>
 HY2.0-4P, JST SH /GH), which have different pin orders, plug sizes and
 pitches. Suggest working back from the ESP32 Grove to the sensor
 requirement.</p>
-<p><img src="CdA_Calculator/AeroDoc_Git/media/image8.png"
+<p><img src="AeroDoc_Git/media/image8.png"
 style="width:6.75347in;height:6.28681in" /></p>
 <h2 id="working-prototypes">Working Prototypes</h2>
 <p>Prototypes below:</p>
@@ -885,12 +885,12 @@ be the loss of correlation with other cycling metrics.</p>
 <tr>
 <th><p>M5Stamp on Grove breakout using wing airspeed sensor, BMP280 and
 Accel; breakout has a built in battery unit.</p>
-<p><img src="CdA_Calculator/AeroDoc_Git/media/image9.png"
+<p><img src="AeroDoc_Git/media/image9.png"
 style="width:3.64452in;height:3.81204in" /><img
-src="CdA_Calculator/AeroDoc_Git/media/image10.png"
+src="AeroDoc_Git/media/image10.png"
 style="width:3.42019in;height:2.37742in" /></p></th>
 <th><p>M5Stamp using airspeed sensor with external Pitot tube and
-BMP390, needs external battery unit<img src="CdA_Calculator/AeroDoc_Git/media/image11.jpg"
+BMP390, needs external battery unit<img src="AeroDoc_Git/media/image11.jpg"
 style="width:3.56124in;height:3.61807in" /></p>
 <p>Capsule using wing airspeed sensor and BMP280, this is best solution,
 internal battery, internal accelerometer and card for additional
@@ -1062,9 +1062,9 @@ factors below:</p>
 </colgroup>
 <thead>
 <tr>
-<th style="text-align: left;"><img src="CdA_Calculator/AeroDoc_Git/media/image12.png"
+<th style="text-align: left;"><img src="AeroDoc_Git/media/image12.png"
 style="width:3.23705in;height:2.70208in" /></th>
-<th style="text-align: left;"><img src="CdA_Calculator/AeroDoc_Git/media/image13.png"
+<th style="text-align: left;"><img src="AeroDoc_Git/media/image13.png"
 style="width:3.52268in;height:2.60347in" /></th>
 </tr>
 </thead>
@@ -1088,9 +1088,9 @@ class="math inline">\(\text{±1C}\)</span></p>
 </colgroup>
 <thead>
 <tr>
-<th style="text-align: left;"><img src="CdA_Calculator/AeroDoc_Git/media/image14.png"
+<th style="text-align: left;"><img src="AeroDoc_Git/media/image14.png"
 style="width:2.53465in;height:2.56447in" /></th>
-<th style="text-align: left;"><img src="CdA_Calculator/AeroDoc_Git/media/image15.png"
+<th style="text-align: left;"><img src="AeroDoc_Git/media/image15.png"
 style="width:2.24227in;height:2.24724in" /></th>
 </tr>
 </thead>
@@ -1108,7 +1108,7 @@ BMP280:</p>
 addresses.</p></li>
 </ul>
 <blockquote>
-<p><img src="CdA_Calculator/AeroDoc_Git/media/image16.png"
+<p><img src="AeroDoc_Git/media/image16.png"
 style="width:3in;height:2.02778in" /></p>
 </blockquote>
 <p>BMP390 measures temperature for internal compensation, this
@@ -1132,7 +1132,7 @@ can detect tilt changes of less than 1.0°.</p></li>
 detecting tap/double-tap events, general activity, and
 inactivity</p></li>
 </ul>
-<p><img src="CdA_Calculator/AeroDoc_Git/media/image17.png"
+<p><img src="AeroDoc_Git/media/image17.png"
 style="width:2.47619in;height:2.89764in" /></p>
 <p>I've tested 1 US accelerometer product; the results are similar to
 checking the delta velocities. Though not in the git.</p>
@@ -1151,7 +1151,7 @@ create an automated Aerodynamic Position Classifier/ Area Estimated. The
 sensors combined with machine learning models could match distinct
 geometric postures directly to their corresponding real-time drag
 values.</p>
-<p><img src="CdA_Calculator/AeroDoc_Git/media/image18.png"
+<p><img src="AeroDoc_Git/media/image18.png"
 style="width:4.48264in;height:1.78231in" /></p>
 <p>Collected data could train a model, which is then used as classifier
 for good positions, an AI camera with depth perception is also an
@@ -1175,9 +1175,9 @@ light signal strength in photon-detecting and ranging sensors.</p></li>
 </colgroup>
 <thead>
 <tr>
-<th><img src="CdA_Calculator/AeroDoc_Git/media/image19.png"
+<th><img src="AeroDoc_Git/media/image19.png"
 style="width:2.76191in;height:1.74962in" /></th>
-<th><p><img src="CdA_Calculator/AeroDoc_Git/media/image20.png"
+<th><p><img src="AeroDoc_Git/media/image20.png"
 style="width:3.75535in;height:2.55597in" /></p>
 <ul>
 <li><p>Line 1. distance in mm</p></li>
@@ -1203,9 +1203,9 @@ body position monitoring:</p>
 </colgroup>
 <thead>
 <tr>
-<th><img src="CdA_Calculator/AeroDoc_Git/media/image21.png"
+<th><img src="AeroDoc_Git/media/image21.png"
 style="width:3.28513in;height:2.7483in" /></th>
-<th><img src="CdA_Calculator/AeroDoc_Git/media/image22.png"
+<th><img src="AeroDoc_Git/media/image22.png"
 style="width:3.40266in;height:2.80737in" /></th>
 </tr>
 </thead>
@@ -1213,7 +1213,7 @@ style="width:3.40266in;height:2.80737in" /></th>
 </tbody>
 </table>
 <p>In 3-model</p>
-<h2 id="section-2"><img src="CdA_Calculator/AeroDoc_Git/media/image23.png"
+<h2 id="section-2"><img src="AeroDoc_Git/media/image23.png"
 style="width:5.00778in;height:3.42177in" /></h2>
 <h2 id="section-3"></h2>
 <h2 id="appendix-04-esp32-logging-and-persistence-workflow">Appendix 0‑4
@@ -1292,7 +1292,7 @@ executes compute(info) function.</p></li>
 <p>Because these cycles are decoupled, the 4 Hz packets will land at
 varying times within that 1-second Garmin window. In a perfect
 "unlikely" world the situation would be:</p>
-<p><img src="CdA_Calculator/AeroDoc_Git/media/image24.png"
+<p><img src="AeroDoc_Git/media/image24.png"
 style="width:6.75347in;height:1.50139in" /></p>
 <p>In all cases, 4 Hz packets will be "out of phase" with Garmin's 1 HZ
 sensor data, note the Garmin works a 1HZ, sensors could operate at much
@@ -1322,13 +1322,13 @@ Controller Hardware</h2>
 are dual core processors, (Cs are single core, which the code supports).
 One core handles sensor, the other manages BLE communications.
 M5Stamp-S3A costs around 10 USD.</p>
-<p><img src="CdA_Calculator/AeroDoc_Git/media/image25.png"
+<p><img src="AeroDoc_Git/media/image25.png"
 style="width:3.05903in;height:2.60396in" /></p>
 <h3 id="section-4"></h3>
 <h3 id="m5stamp-grove-breakout-board">M5Stamp Grove Breakout Board</h3>
 <p>The expansion board adds a battery holder, and simplifies the
 connection of I2C sensors with Grove ports. Around 6 USD.</p>
-<p><img src="CdA_Calculator/AeroDoc_Git/media/image26.png"
+<p><img src="AeroDoc_Git/media/image26.png"
 style="width:4.0495in;height:3.86636in" /></p>
 <p>(Only the 16340 fits)</p>
 <h3 id="m5stack-capsules">M5Stack Capsules</h3>
@@ -1336,7 +1336,7 @@ style="width:4.0495in;height:3.86636in" /></p>
 built around the <strong>M5StampS3</strong>. It’s the most suitable for
 building the home solution, it would need a 2 I2C adapter, and will
 minimize all wiring and control. (Not shown, as mine hasn't arrived</p>
-<p><img src="CdA_Calculator/AeroDoc_Git/media/image27.png"
+<p><img src="AeroDoc_Git/media/image27.png"
 style="width:3.57426in;height:3.52808in" /></p>
 <p>Useful for Project Features:</p>
 <ul>

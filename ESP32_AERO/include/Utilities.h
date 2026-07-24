@@ -37,7 +37,12 @@ void fmtNA(char* buf, size_t sz, float val, const char* fmt, bool available);
 /**
  * @brief Serializes sensor data into a pipe-delimited string.
  */
-void serializeTelemetry(char* outBuf, size_t sz, float as, float rho, float t, float p, float alt, float alt_ch, float gs, bool as_ok, bool bmp_ok, bool csc_ok);
+void serializeTelemetry(char* outBuf, size_t sz, float as, float rho, float t,
+                        float p, float alt, float alt_ch, float gs,
+                        float climb_rate, float forward_accel,
+                        float accel_x, float accel_y, float accel_z,
+                        bool as_ok, bool temp_ok, bool bmp_ok,
+                        bool csc_ok, bool imu_ok);
 
 /**
  * @brief Manually flushes the current RAM buffer to the active storage.
@@ -63,5 +68,6 @@ void printMenu();
  * @brief Processes incoming serial characters and executes corresponding commands.
  */
 void handleSerialCommand(char c);
+void serviceUtilities();
 
 #endif // UTILITIES_H

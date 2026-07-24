@@ -22,6 +22,7 @@ var sensorValue as Float?;
 
     function onStart(state as Dictionary?) as Void {
         refreshSensorSetting();
+        System.println("CdA: app started [alt-debug-2]");
         if (Utilities.BLE_DEBUG) {
             System.println("BLE: App start; external sensor enabled=" + Utilities.USING_SENSOR);
         }

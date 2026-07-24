@@ -7,7 +7,7 @@ import Toybox.SensorHistory;
 
 module Utilities {
     // Constants
-    const DEBUG            = false; // silences the garmin Data Table/updateDebugGarmin
+    const DEBUG            = true;   // Enables the compact live calculation output
     const BLE_DEBUG        = false;  // Enables verbose Bluetooth scanning and RX logs
     // Safe startup default: run from Garmin's internal sensors unless the
     // persisted "use_sensor" setting explicitly enables the BLE sensor.
@@ -54,27 +54,6 @@ module Utilities {
     // Fallback if sensors aren't ready (e.g., just turned on the device)
     return 25.0f; 
 }
-
-    /**
-     * Updates the debug array with raw Garmin sensor data.
-     * @param debugArray The array to populate (usually _debugGarmin)
-     * @param rawSpeed   Current speed from Activity.Info
-     * @param rawAlt     Current altitude from Activity.Info
-     * @param tempC      Not used Current temperature in Celsius
-   
-     */
-    function updateDebugGarmin(debugArray as Array<Float?>, rawSpeed as Float, rawAlt as Float, tempC as Float, pressurePa as Float?) as Void {
-        debugArray[AIR_SPEED_INX] = rawSpeed; // Garmin default: Air = Ground
-        debugArray[ALT_INX]       = rawAlt;
-        
-
-        // Pre-calculate Garmin-only Rho for comparison in the debug table
-        if (pressurePa != null) {
-            debugArray[RHO_INX] = (pressurePa as Float) / (SPECIFIC_GAS_CONSTANT * (tempC + ABSOLUTE_ZERO_TEMP));
-        } else {
-            debugArray[RHO_INX] = null;
-        }
-    }
 
     /**
      * Calculates the filtered CHANGE in altitude (delta).
